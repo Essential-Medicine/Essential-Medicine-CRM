@@ -143,16 +143,21 @@ tbody tr:hover{background:#F8FAFC}
 <body>
 <div id="app"></div>
 
+<script src="config.js"></script>
+
 <script type="module">
 /* ============================================================================
    CONFIGURATION
    Paste your Supabase project URL and anon key here, then deploy this file to
    any static host. Leave blank to run in demo mode with in-memory sample data.
    ========================================================================= */
-const CONFIG = {
-  SUPABASE_URL: 'https://dvaxfkjunsdrtrzskwmq.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_ULRqS7UfzVZAtV5sd00nYg_w3bymsHa'
+const FALLBACK = {
+  SUPABASE_URL: '',
+  SUPABASE_ANON_KEY: ''
 };
+// config.js sits next to this file and sets window.S21_CONFIG. Keeping the
+// two values there means an update to this file never asks you to re-enter them.
+const CONFIG = (window.S21_CONFIG && window.S21_CONFIG.SUPABASE_URL) ? window.S21_CONFIG : FALLBACK;
 
 /* ---------------------------------------------------------------- SOP v2 */
 const SOP_VERSION = '2.0';
@@ -220,7 +225,7 @@ const PASS_MARK = 0.8;
 /* ---------------------------------------------------------------- data layer */
 let sb = null, DEMO = true;
 const mem = {profiles:[],practices:[],doctors:[],representatives:[],suppliers:[],couriers:[],
-  requests:[],tasks:[],rfq_items:[],approvals:[],audit_log:[],invoice_lines:[],training_attempts:[]};
+  requests:[],request_items:[],tasks:[],rfq_items:[],approvals:[],audit_log:[],invoice_lines:[],training_attempts:[]};
 let seqNo = 1;
 const uid = () => 'id' + Math.random().toString(36).slice(2, 10);
 
@@ -280,7 +285,7 @@ async function restoreSession(){
 }
 async function refresh(){
   if (!ME) return;
-  const t = ['profiles','practices','doctors','representatives','suppliers','couriers','requests','tasks','rfq_items','approvals','audit_log','invoice_lines','training_attempts'];
+  const t = ['profiles','practices','doctors','representatives','suppliers','couriers','requests','request_items','tasks','rfq_items','approvals','audit_log','invoice_lines','training_attempts'];
   const res = await Promise.all(t.map(x => db.list(x)));
   t.forEach((k,i)=> cache[k] = res[i]);
 }
@@ -288,6 +293,9 @@ const isMgr = () => ME && (ME.role === 'senior_manager' || ME.role === 'admin');
 const isAdmin = () => ME && ME.role === 'admin';
 const mine = r => r.owner_id === ME.id;
 const visible = list => isMgr() ? list : list.filter(mine);
+const itemsOf = rid => cache.request_items.filter(i => i.request_id === rid);
+const itemLabel = i => [i.strength, i.pack_size, i.quantity].filter(Boolean).join(', ');
+const itemSummary = rid => itemsOf(rid).map(itemLabel).join(' | ');
 
 /* ---------------------------------------------------------------- time */
 const BH_START = 8, BH_END = 17;                    // SAST working day
@@ -392,7 +400,7 @@ function authView(){
       <h1 style="margin-top:6px">Request Manager</h1>
     </div>
     <div class="card"><div class="body">
-      ${DEMO ? `<div class="banner" style="margin-bottom:14px">Demo mode. No backend is configured, so data lives in this browser tab only. Add your Supabase URL and key at the top of index.html to run for real.</div>
+      ${DEMO ? `<div class="banner" style="margin-bottom:14px">Demo mode. No backend is configured, so data lives in this browser tab only. Check that config.js sits next to index.html and contains your Supabase URL and key.</div>
         <div class="field"><label>Sign in as</label><select id="demorole">
           <option value="u-user">Team Member, user</option>
           <option value="u-mgr">Senior Manager</option>
@@ -524,7 +532,9 @@ function reqProgress(r){
 function requestsView(){
   const rows = visible(cache.requests).sort((a,b)=> a.created_at < b.created_at ? 1 : -1);
   return `<div class="page-head"><div><span class="eyebrow">Requests</span><h1>${isMgr()?'All requests':'Your requests'}</h1></div>
-    <div class="row"><button class="btn ghost" data-export="requests">Export CSV</button><button class="btn" data-go="newreq">New request</button></div></div>
+    <div class="row"><button class="btn ghost" data-export="requests">Export requests CSV</button>
+      <button class="btn ghost" data-export="items">Export lines CSV</button>
+      <button class="btn" data-go="newreq">New request</button></div></div>
   <div class="card">${rows.length?`<table><thead><tr><th>Ref</th><th>Product</th><th>Practice</th><th>Owner</th><th>Phase</th><th>Progress</th><th>Status</th></tr></thead><tbody>
     ${rows.map(r=>{
       const {done,total,next} = reqProgress(r);
@@ -533,7 +543,7 @@ function requestsView(){
       const od = cache.tasks.some(t=>t.request_id===r.id && overdue(t) && t.sla_type!=='external');
       return `<tr style="cursor:pointer" data-open="${r.id}">
         <td class="mono">${esc(r.ref)}${r.urgent?' <span class="tag t-red">urgent</span>':''}</td>
-        <td>${esc(r.product_name)}<div class="small muted">${esc(r.strength||'')}</div></td>
+        <td>${esc(r.product_name)}<div class="small muted">${esc(itemSummary(r.id) || r.strength || '')}</div></td>
         <td class="small">${esc(pr?pr.name:'')}</td>
         <td class="small">${esc(o?o.full_name:'')}</td>
         <td><span class="tag t-navy">${next?esc(next.phase):'Complete'}</span></td>
@@ -555,16 +565,35 @@ function newRequestView(){
       <div class="field"><label>Representative, optional</label><select id="f-rep"></select></div>
       <div class="field"><label>Patient reference</label><input id="f-patient" placeholder="SAN-014"></div>
       <div class="field"><label>Product</label><input id="f-product" placeholder="Ifosfamide"></div>
-      <div class="field"><label>Strength</label><input id="f-strength" placeholder="1 g vial"></div>
-      <div class="field"><label>Pack size</label><input id="f-pack" placeholder="1 vial per pack"></div>
-      <div class="field"><label>Quantity required</label><input id="f-qty" placeholder="54 packs"></div>
       <div class="field"><label>Required by</label><input id="f-by" type="date"></div>
       <div class="field"><label>Who prepares the Section 21 application</label>
         <select id="f-s21"><option value="us">We prepare and submit it</option><option value="practice">The practice submits it</option></select></div>
     </div>
+    <div class="field"><label>Strengths and pack sizes required</label>
+      <table id="item-rows"><thead><tr><th>Strength</th><th>Pack size</th><th>Quantity</th><th></th></tr></thead>
+      <tbody>${itemRow()}</tbody></table>
+      <div style="margin-top:8px"><button class="btn ghost sm" id="item-add">Add another strength</button></div>
+      <div class="hint">One line per strength or pack size. All lines belong to the same patient and move through the workflow together.</div>
+    </div>
     <div class="field"><label><input type="checkbox" id="f-urgent" style="width:auto;margin-right:6px">Urgent case</label></div>
     <button class="btn" id="f-save">Create request</button>
   </div></div>`;
+}
+
+function itemRow(v = {}){
+  return `<tr><td><input class="i-str" placeholder="1 g vial" value="${esc(v.strength||'')}"></td>
+    <td><input class="i-pack" placeholder="1 vial per pack" value="${esc(v.pack_size||'')}"></td>
+    <td><input class="i-qty" placeholder="54 packs" value="${esc(v.quantity||'')}"></td>
+    <td style="text-align:right"><button class="btn ghost sm i-del" type="button">Remove</button></td></tr>`;
+}
+function readItemRows(){
+  const tb = document.querySelector('#item-rows tbody');
+  if (!tb) return [];
+  return Array.from(tb.rows).map(tr => ({
+    strength: tr.querySelector('.i-str').value.trim(),
+    pack_size: tr.querySelector('.i-pack').value.trim(),
+    quantity: tr.querySelector('.i-qty').value.trim()
+  })).filter(i => i.strength || i.pack_size || i.quantity);
 }
 
 async function createRequest(){
@@ -573,15 +602,17 @@ async function createRequest(){
   if (!practice_id || !doctor_id) return toast('Select a practice and doctor');
   if (!g('f-patient').value.trim()) return toast('Enter a patient reference');
   if (!g('f-product').value.trim()) return toast('Enter the product');
+  const items = readItemRows();
+  if (!items.length) return toast('Enter at least one strength, pack size or quantity');
   const s21 = g('f-s21').value === 'us';
   const ref = DEMO ? 'S21-2026-' + String(seqNo++).padStart(4,'0') : undefined;
   const row = {practice_id, doctor_id, representative_id: g('f-rep').value || null,
     patient_ref: g('f-patient').value.trim(), product_name: g('f-product').value.trim(),
-    strength: g('f-strength').value.trim(), pack_size: g('f-pack').value.trim(),
-    quantity: g('f-qty').value.trim(), required_by: g('f-by').value || null,
+    required_by: g('f-by').value || null,
     urgent: g('f-urgent').checked, s21_by_us: s21, status:'open', owner_id: ME.id, sop_version: SOP_VERSION};
   if (ref) row.ref = ref;
   const [req] = await db.insert('requests', row);
+  await db.insert('request_items', items.map(i => ({...i, request_id: req.id})));
 
   const steps = STEPS.filter(s => s.cond === 'always' || (s.cond === 's21_by_us' && s21) ||
     (s.cond === 's21_by_practice' && !s21) || s.cond === 'nappi_missing');
@@ -596,7 +627,7 @@ async function createRequest(){
   await advanceDues(req.id);
   const sups = cache.suppliers.filter(s=>s.active!==false);
   await db.insert('rfq_items', sups.map(s=>({request_id:req.id, supplier_id:s.id, status:'not_sent', updated_by:ME.id, updated_at:now})));
-  await log('Request created', {request_id:req.id, entity:'request', entity_id:req.ref, detail:`${req.product_name}, Section 21 by ${s21?'us':'practice'}`});
+  await log('Request created', {request_id:req.id, entity:'request', entity_id:req.ref, detail:`${req.product_name}, ${items.length} line${items.length>1?'s':''}, Section 21 by ${s21?'us':'practice'}`});
   toast('Request ' + req.ref + ' created');
   go('request', req.id);
 }
@@ -684,7 +715,7 @@ function requestView(id){
 
   return `<div class="page-head">
     <div><span class="eyebrow">${esc(r.ref)} , ${esc(owner.full_name||'')}</span>
-      <h1>${esc(r.product_name)} ${esc(r.strength||'')}</h1>
+      <h1>${esc(r.product_name)}</h1>
       <p class="small muted" style="margin:4px 0 0">${esc(pr.name||'')} , ${esc(dr.full_name||'')}${rep?' , via '+esc(rep.full_name):''} , patient ${esc(r.patient_ref)}</p></div>
     <div class="row">
       <button class="btn ghost" data-go="requests">Back</button>
@@ -702,6 +733,16 @@ function requestView(id){
       ${r.sahpra_ref?`<span>SAHPRA ${esc(r.sahpra_ref)}</span>`:''}
     </div>
   </div></div>
+
+  <div class="card" style="margin-bottom:14px"><header><h2>Lines on this request</h2>
+    ${r.status==='open'?'<button class="btn ghost sm" data-additem="'+r.id+'">Add line</button>':''}</header>
+    ${itemsOf(id).length?`<table><thead><tr><th>Strength</th><th>Pack size</th><th>Quantity</th><th>Note</th>${r.status==='open'?'<th></th>':''}</tr></thead><tbody>
+      ${itemsOf(id).map(i=>`<tr><td>${esc(i.strength||'')}</td><td class="small">${esc(i.pack_size||'')}</td>
+        <td class="mono small">${esc(i.quantity||'')}</td><td class="small muted">${esc(i.notes||'')}</td>
+        ${r.status==='open'?`<td style="text-align:right"><button class="btn ghost sm" data-edititem="${i.id}">Edit</button>
+        <button class="btn ghost sm" data-delitem="${i.id}">Remove</button></td>`:''}</tr>`).join('')}
+    </tbody></table>`:`<div class="empty">No lines recorded.</div>`}
+  </div>
 
   <div class="card" style="margin-bottom:14px"><header><h2>Workflow</h2>
     <span class="small muted">${ts.filter(t=>['done','na'].includes(t.status)).length} of ${ts.length} complete</span></header>
@@ -780,7 +821,7 @@ async function completeTask(taskId){
   }
   if (t.step_code === '7.2'){
     modal('Close the request and raise the invoice line', `
-      <div class="field"><label>Invoice description</label><input id="m-desc" value="Section 21 facilitation, ${esc(r.product_name)} ${esc(r.strength||'')}"></div>
+      <div class="field"><label>Invoice description</label><input id="m-desc" value="Section 21 facilitation, ${esc(r.product_name)}${itemsOf(r.id).length?', '+esc(itemSummary(r.id)):''}"></div>
       <div class="field"><label>Note</label><input id="m-note2" placeholder="Optional reference"></div>`,
       async () => {
         await db.insert('invoice_lines', {request_id:r.id, ref:r.ref, description:document.getElementById('m-desc').value.trim(),
@@ -1073,7 +1114,7 @@ function modal(title, bodyHtml, onOk){
   el.addEventListener('click', e => { if (e.target === el || e.target.hasAttribute('data-mclose')) el.remove(); });
   el.querySelector('#m-ok').onclick = async () => {
     const fn = modalOk;
-    if (fn){ const keep = await fn(); if (keep === false) return; }
+    if (fn){ const keep = await fn(); if (keep === false) return; }   // validation failed, leave the dialog open
     el.remove();
   };
 }
@@ -1088,7 +1129,7 @@ function addForm(kind, parentId){
     <div class="field"><label>Email</label><input id="n-email"></div></div>`,
     async () => {
       const v = id => (document.getElementById(id)||{}).value?.trim();
-      if (!v('n-name')) return toast('Enter a practice name');
+      if (!v('n-name')){ toast('Enter a practice name'); return false; }
       const [p] = await db.insert('practices', {name:v('n-name'), bhf_number:v('n-bhf'), city:v('n-city'), phone:v('n-phone'), email:v('n-email'), active:true, owner_id:ME.id});
       await log('Practice added', {entity:'practice', entity_id:p.id, detail:p.name}); render();
     }];
@@ -1100,7 +1141,7 @@ function addForm(kind, parentId){
     <div class="field"><label>Email</label><input id="n-email"></div></div>`,
     async () => {
       const v = id => (document.getElementById(id)||{}).value?.trim();
-      if (!v('n-name')) return toast('Enter a name');
+      if (!v('n-name')){ toast('Enter a name'); return false; }
       const [d] = await db.insert('doctors', {practice_id:parentId, full_name:v('n-name'), hpcsa_number:v('n-hpcsa'), speciality:v('n-spec'), phone:v('n-phone'), email:v('n-email'), active:true, owner_id:ME.id});
       await log('Doctor added', {entity:'doctor', entity_id:d.id, detail:d.full_name}); render();
     }];
@@ -1111,7 +1152,7 @@ function addForm(kind, parentId){
     <div class="field"><label>Email</label><input id="n-email"></div></div>`,
     async () => {
       const v = id => (document.getElementById(id)||{}).value?.trim();
-      if (!v('n-name')) return toast('Enter a name');
+      if (!v('n-name')){ toast('Enter a name'); return false; }
       const [x] = await db.insert('representatives', {practice_id:parentId, full_name:v('n-name'), company:v('n-company'), phone:v('n-phone'), email:v('n-email'), active:true, owner_id:ME.id});
       await log('Representative added', {entity:'representative', entity_id:x.id, detail:x.full_name}); render();
     }];
@@ -1123,7 +1164,7 @@ function addForm(kind, parentId){
     <div class="field"><label>Mobile</label><input id="n-mobile"></div></div>`,
     async () => {
       const v = id => (document.getElementById(id)||{}).value?.trim();
-      if (!v('n-name')) return toast('Enter a supplier name');
+      if (!v('n-name')){ toast('Enter a supplier name'); return false; }
       const [s] = await db.insert('suppliers', {name:v('n-name'), country:v('n-country'), contact_name:v('n-contact'), email:v('n-email'), mobile:v('n-mobile'), tel:'', website:'', active:true});
       await log('Supplier added', {entity:'supplier', entity_id:s.id, detail:s.name}); render();
     }];
@@ -1135,7 +1176,7 @@ function addForm(kind, parentId){
     <div class="field"><label>Cold chain</label><select id="n-cold"><option value="no">No</option><option value="yes">Yes</option></select></div></div>`,
     async () => {
       const v = id => (document.getElementById(id)||{}).value?.trim();
-      if (!v('n-name')) return toast('Enter a company name');
+      if (!v('n-name')){ toast('Enter a company name'); return false; }
       const [c] = await db.insert('couriers', {name:v('n-name'), contact_name:v('n-contact'), contact_number:v('n-number'), email:v('n-email'), cold_chain: v('n-cold')==='yes', active:true});
       await log('Courier added', {entity:'courier', entity_id:c.id, detail:c.name}); render();
     }];
@@ -1158,7 +1199,7 @@ function exportSet(what){
   const stamp = new Date().toISOString().slice(0,10);
   const nameOf = (t,id,f='full_name') => { const x = cache[t].find(r=>r.id===id); return x ? x[f] : ''; };
   if (what === 'requests'){
-    const rows = visible(cache.requests).map(r=>({ref:r.ref, product:r.product_name, strength:r.strength, quantity:r.quantity,
+    const rows = visible(cache.requests).map(r=>({ref:r.ref, product:r.product_name, lines:itemSummary(r.id), line_count:itemsOf(r.id).length,
       practice:nameOf('practices',r.practice_id,'name'), doctor:nameOf('doctors',r.doctor_id), representative:nameOf('representatives',r.representative_id),
       patient_ref:r.patient_ref, required_by:r.required_by, urgent:r.urgent, section21_by_us:r.s21_by_us, nappi_code:r.nappi_code,
       sahpra_ref:r.sahpra_ref, status:r.status, owner:nameOf('profiles',r.owner_id), created:r.created_at, closed:r.closed_at}));
@@ -1174,6 +1215,15 @@ function exportSet(what){
     return download(`customers_${stamp}.csv`, toCSV(rows));
   }
   if (what === 'suppliers') return download(`suppliers_${stamp}.csv`, toCSV(cache.suppliers.map(({id,...r})=>r)));
+  if (what === 'items'){
+    const ids = visible(cache.requests).map(r=>r.id);
+    const rows = cache.request_items.filter(i=>ids.includes(i.request_id)).map(i=>{
+      const r = cache.requests.find(x=>x.id===i.request_id);
+      return {ref:r.ref, product:r.product_name, strength:i.strength, pack_size:i.pack_size, quantity:i.quantity,
+        notes:i.notes, practice:nameOf('practices',r.practice_id,'name'), patient_ref:r.patient_ref, status:r.status};
+    });
+    return download(`request_lines_${stamp}.csv`, toCSV(rows));
+  }
   if (what === 'tasks'){
     const ids = visible(cache.requests).map(r=>r.id);
     const rows = cache.tasks.filter(t=>ids.includes(t.request_id)).map(t=>{
@@ -1220,7 +1270,7 @@ function wire(){
     const t = cache.tasks.find(x=>x.id===e.currentTarget.dataset.na);
     modal('Mark step not applicable', `<div class="field"><label>Reason, required</label><input id="m-r"></div>`, async () => {
       const reason = document.getElementById('m-r').value.trim();
-      if (!reason) return toast('A reason is required');
+      if (!reason){ toast('A reason is required'); return false; }
       await db.update('tasks', t.id, {status:'na', comment:reason, completed_at:new Date().toISOString(), completed_by:ME.id});
       await log('Step marked not applicable, ' + t.step_code, {request_id:t.request_id, entity:'task', entity_id:t.step_code, detail:reason});
       await refresh(); await advanceDues(t.request_id); render();
@@ -1292,6 +1342,51 @@ function wire(){
     await log('Role changed to ' + role, {entity:'profile', entity_id:id, detail:p.full_name});
     if (id === ME.id) ME.role = role;
     toast('Role updated'); render();
+  });
+
+  const ia = document.getElementById('item-add');
+  if (ia){
+    const tb = document.querySelector('#item-rows tbody');
+    ia.onclick = () => tb.insertAdjacentHTML('beforeend', itemRow());
+    tb.addEventListener('click', e => {
+      if (!e.target.classList.contains('i-del')) return;
+      if (tb.rows.length > 1) e.target.closest('tr').remove(); else toast('Keep at least one line');
+    });
+  }
+  on('[data-additem]','click', e => {
+    const rid = e.currentTarget.dataset.additem;
+    modal('Add a line', `<div class="grid g2">
+      <div class="field"><label>Strength</label><input id="m-str"></div>
+      <div class="field"><label>Pack size</label><input id="m-pack"></div>
+      <div class="field"><label>Quantity</label><input id="m-qty"></div>
+      <div class="field"><label>Note</label><input id="m-inote"></div></div>`, async () => {
+      const v = id => document.getElementById(id).value.trim();
+      if (!v('m-str') && !v('m-qty')){ toast('Enter a strength or a quantity'); return false; }
+      await db.insert('request_items', {request_id:rid, strength:v('m-str'), pack_size:v('m-pack'), quantity:v('m-qty'), notes:v('m-inote')});
+      await log('Line added, ' + v('m-str') + ' ' + v('m-qty'), {request_id:rid, entity:'request_item'});
+      render();
+    });
+  });
+  on('[data-edititem]','click', e => {
+    const i = cache.request_items.find(x=>x.id===e.currentTarget.dataset.edititem);
+    modal('Edit line', `<div class="grid g2">
+      <div class="field"><label>Strength</label><input id="m-str" value="${esc(i.strength||'')}"></div>
+      <div class="field"><label>Pack size</label><input id="m-pack" value="${esc(i.pack_size||'')}"></div>
+      <div class="field"><label>Quantity</label><input id="m-qty" value="${esc(i.quantity||'')}"></div>
+      <div class="field"><label>Note</label><input id="m-inote" value="${esc(i.notes||'')}"></div></div>`, async () => {
+      const v = id => document.getElementById(id).value.trim();
+      await db.update('request_items', i.id, {strength:v('m-str'), pack_size:v('m-pack'), quantity:v('m-qty'), notes:v('m-inote')});
+      await log('Line amended', {request_id:i.request_id, entity:'request_item', detail:v('m-str') + ' ' + v('m-qty')});
+      render();
+    });
+  });
+  on('[data-delitem]','click', e => {
+    const i = cache.request_items.find(x=>x.id===e.currentTarget.dataset.delitem);
+    modal('Remove this line', `<p class="small">${esc(itemLabel(i))}</p>`, async () => {
+      await db.remove('request_items', i.id);
+      await log('Line removed, ' + itemLabel(i), {request_id:i.request_id, entity:'request_item'});
+      render();
+    });
   });
 
   // new request: cascading selects
