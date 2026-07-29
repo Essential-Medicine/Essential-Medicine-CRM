@@ -1071,7 +1071,11 @@ function modal(title, bodyHtml, onOk){
     <footer><button class="btn ghost" data-mclose>Cancel</button><button class="btn" id="m-ok">Confirm</button></footer></div>`;
   document.body.appendChild(el);
   el.addEventListener('click', e => { if (e.target === el || e.target.hasAttribute('data-mclose')) el.remove(); });
-  el.querySelector('#m-ok').onclick = async () => { const fn = modalOk; el.remove(); if (fn) await fn(); };
+  el.querySelector('#m-ok').onclick = async () => {
+    const fn = modalOk;
+    if (fn){ const keep = await fn(); if (keep === false) return; }
+    el.remove();
+  };
 }
 
 /* ---------------------------------------------------------------- add forms */
