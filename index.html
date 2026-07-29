@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Section 21 Request Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#101720; --ink-2:#3B4753; --muted:#6B7885; --canvas:#EBEFF3; --surface:#FFFFFF;
+  --rule:#D3DAE1; --rule-2:#E7ECF1;
+  --navy:#1F3864; --navy-tint:#E6EBF4;
+  --amber:#9A5B00; --amber-tint:#FBF0DE;
+  --red:#A62B21; --red-tint:#FAE7E5;
+  --green:#1B6B4F; --green-tint:#E3F1EB;
+  --violet:#474A8C; --violet-tint:#E9E9F5;
+  --sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Consolas,monospace;
+  --sp:4px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--canvas);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-0.011em}
+h1{font-size:21px}h2{font-size:17px}h3{font-size:14px}
+a{color:var(--navy)}
+button{font:inherit}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.hidden{display:none !important}
+
+/* ---------- shell ---------- */
+#app{min-height:100vh}
+.shell{display:grid;grid-template-columns:216px 1fr;min-height:100vh}
+.side{background:var(--ink);color:#C7D0DA;padding:20px 14px;display:flex;flex-direction:column;gap:24px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{line-height:1.15}
+.brand b{display:block;color:#fff;font-size:14px;letter-spacing:-0.01em}
+.brand span{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#7C8B9B}
+.nav{display:flex;flex-direction:column;gap:1px}
+.nav button{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:0;color:#AEBAC7;padding:7px 10px;border-radius:5px;cursor:pointer;font-size:13px}
+.nav button:hover{background:#1B2530;color:#fff}
+.nav button.on{background:#243141;color:#fff;font-weight:500}
+.nav .pill{font-family:var(--mono);font-size:10px;background:var(--red);color:#fff;border-radius:9px;padding:1px 6px}
+.nav .pill.q{background:#3C4B5C;color:#C7D0DA}
+.whoami{margin-top:auto;border-top:1px solid #26313D;padding-top:14px;font-size:12px}
+.whoami b{color:#fff;display:block}
+.main{padding:24px 28px 64px;max-width:1240px}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:18px;flex-wrap:wrap}
+
+/* ---------- primitives ---------- */
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:8px}
+.card>header{padding:12px 16px;border-bottom:1px solid var(--rule-2);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.card>.body{padding:16px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--navy);color:#fff;border:1px solid var(--navy);padding:6px 13px;border-radius:5px;cursor:pointer;font-size:13px;font-weight:500}
+.btn:hover{filter:brightness(1.12)}
+.btn.ghost{background:transparent;color:var(--ink-2);border-color:var(--rule)}
+.btn.ghost:hover{background:var(--canvas);filter:none}
+.btn.sm{padding:3px 9px;font-size:12px}
+.btn.danger{background:var(--red);border-color:var(--red)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+label{display:block;font-size:12px;font-weight:500;color:var(--ink-2);margin-bottom:4px}
+input,select,textarea{width:100%;padding:7px 9px;border:1px solid var(--rule);border-radius:5px;background:#fff;font:inherit;color:var(--ink)}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
+textarea{min-height:64px;resize:vertical}
+.field{margin-bottom:12px}
+.hint{font-size:11px;color:var(--muted);margin-top:3px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--rule)}
+td{padding:9px 10px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#F8FAFC}
+.tag{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:3px;border:1px solid transparent;white-space:nowrap}
+.t-navy{background:var(--navy-tint);color:var(--navy)}
+.t-amber{background:var(--amber-tint);color:var(--amber)}
+.t-red{background:var(--red-tint);color:var(--red)}
+.t-green{background:var(--green-tint);color:var(--green)}
+.t-violet{background:var(--violet-tint);color:var(--violet)}
+.t-grey{background:var(--canvas);color:var(--muted)}
+.stat{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:14px 16px}
+.stat b{display:block;font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-0.02em;line-height:1.1}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);font-size:13px}
+.toast{position:fixed;right:18px;bottom:18px;background:var(--ink);color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;z-index:80;box-shadow:0 6px 24px rgba(16,23,32,.28)}
+.modal-bg{position:fixed;inset:0;background:rgba(16,23,32,.45);display:flex;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto;z-index:70}
+.modal{background:var(--surface);border-radius:10px;width:100%;max-width:620px;box-shadow:0 20px 60px rgba(16,23,32,.3)}
+.modal header{padding:14px 18px;border-bottom:1px solid var(--rule-2);display:flex;justify-content:space-between;align-items:center}
+.modal .body{padding:18px}
+.modal footer{padding:12px 18px;border-top:1px solid var(--rule-2);display:flex;justify-content:flex-end;gap:8px}
+
+/* ---------- signature: the request spine ---------- */
+.spine{display:flex;gap:0;padding:6px 0 2px;overflow-x:auto}
+.seg{flex:1 1 0;min-width:96px;padding-right:10px}
+.seg .rail{height:5px;border-radius:3px;background:var(--rule);margin-bottom:7px;position:relative}
+.seg.ext .rail{background:repeating-linear-gradient(90deg,var(--rule) 0 6px,transparent 6px 11px)}
+.seg.ext.fill .rail{background:repeating-linear-gradient(90deg,var(--violet) 0 6px,transparent 6px 11px)}
+.seg.fill .rail{background:var(--green)}
+.seg.now .rail{background:var(--navy)}
+.seg .ph{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block}
+.seg .ct{font-size:11px;color:var(--ink-2)}
+.seg.now .ph{color:var(--navy);font-weight:600}
+
+.task{border-bottom:1px solid var(--rule-2);padding:11px 16px;display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:start}
+.task:last-child{border-bottom:0}
+.task.done{background:#FAFCFB}
+.task.overdue{background:var(--red-tint)}
+.task.na{opacity:.5}
+.task .code{font-family:var(--mono);font-size:12px;color:var(--muted);padding-top:2px}
+.task h4{font-size:13.5px;font-weight:600}
+.task .det{font-size:12.5px;color:var(--ink-2);margin-top:2px}
+.task .meta{font-size:11px;color:var(--muted);margin-top:5px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.task .acts{display:flex;gap:6px;align-items:center}
+.cmt{margin-top:6px;font-size:12px;background:var(--canvas);border-left:2px solid var(--rule);padding:5px 9px;border-radius:0 4px 4px 0}
+
+.calcline{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:5px 0;border-bottom:1px dotted var(--rule-2)}
+.calcline b{font-family:var(--mono);text-align:right}
+.calcline.total{border-bottom:0;border-top:1px solid var(--rule);margin-top:4px;padding-top:8px}
+.sop-step{display:grid;grid-template-columns:46px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid var(--rule-2)}
+.quiz-q{padding:14px 0;border-bottom:1px solid var(--rule-2)}
+.quiz-q label{display:flex;gap:8px;align-items:flex-start;font-weight:400;font-size:13px;color:var(--ink);margin:6px 0}
+.quiz-q input{width:auto;margin-top:2px}
+.banner{background:var(--amber-tint);border:1px solid #E9D3A9;color:#6B4200;padding:9px 14px;border-radius:6px;font-size:12.5px}
+
+@media (max-width:860px){
+  .shell{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:column}
+  .nav{flex-direction:row;flex-wrap:wrap}
+  .main{padding:18px 14px 60px}
+  .g2,.g3,.g4{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:no-preference){
+  .card,.stat{transition:border-color .15s ease}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script type="module">
+/* ============================================================================
+   CONFIGURATION
+   Paste your Supabase project URL and anon key here, then deploy this file to
+   any static host. Leave blank to run in demo mode with in-memory sample data.
+   ========================================================================= */
+const CONFIG = {
+  SUPABASE_URL: 'https://dvaxfkjunsdrtrzskwmq.supabase.co/rest/v1/',
+  SUPABASE_ANON_KEY: 'sb_publishable_ULRqS7UfzVZAtV5sd00nYg_w3bymsHa'
+};
+
+/* ---------------------------------------------------------------- SOP v2 */
+const SOP_VERSION = '2.0';
+const SOP_EFFECTIVE = '2026-07-29';
+const STEPS = [
+ {code:'1.1',phase:'Intake',title:'Log request',detail:'Capture practice, doctor, representative, patient reference, product, strength and route of request.',role:'user',sla:0,type:'start',cond:'always'},
+ {code:'1.2',phase:'Intake',title:'Confirm quantity',detail:'Confirm pack size, units per patient and total quantity required with the requesting party.',role:'user',sla:4,type:'internal',cond:'always'},
+ {code:'1.3',phase:'Intake',title:'Confirm timeline required',detail:'Confirm the date the medicine is required by and whether the case is urgent.',role:'user',sla:4,type:'internal',cond:'always'},
+ {code:'1.4',phase:'Intake',title:'Confirm target price',detail:'Confirm the practice target price. Record confirmation only, not the figure.',role:'user',sla:4,type:'internal',cond:'always'},
+ {code:'1.5',phase:'Intake',title:'Confirm Section 21 scope',detail:'Confirm whether we prepare and submit the application, or the practice does.',role:'user',sla:4,type:'internal',cond:'always'},
+ {code:'2.1',phase:'Sourcing',title:'Issue request for quote',detail:'Send the RFQ from Outlook to the active supplier list. Log dispatch against each supplier in the RFQ tracker.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'2.2',phase:'Sourcing',title:'Follow up non-responders',detail:'Chase every supplier still showing no response and mark the outcome.',role:'user',sla:24,type:'internal',cond:'always'},
+ {code:'2.3',phase:'Sourcing',title:'Close RFQ round',detail:'Mark each supplier as quoted, declined or no response. At least one quote is required to proceed.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'2.4',phase:'Sourcing',title:'Prepare pricing for sign-off',detail:'Enter quotes, currency, FX and landed cost uplift into the pricing calculator. The calculation is not stored.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'2.5',phase:'Sourcing',title:'Senior manager pricing sign-off',detail:'Senior manager reviews the calculation, checks FX and landed cost, and records approval or rejection.',role:'senior_manager',sla:2,type:'approval',cond:'always',approval:'pricing'},
+ {code:'2.6',phase:'Sourcing',title:'Present price to practice',detail:'Send the approved price to the practice, including the 10% reduction for cash paid up front, capped at six months of usage.',role:'user',sla:8,type:'internal',cond:'always'},
+ {code:'2.7',phase:'Sourcing',title:'Practice acceptance',detail:'Await written acceptance and record the payment route selected.',role:'user',sla:0,type:'external',cond:'always'},
+ {code:'3.1',phase:'Regulatory',title:'Confirm product documentation',detail:'Obtain GMP certificate and summary of product characteristics from the quoting supplier.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'3.2',phase:'Regulatory',title:'Check documents against checklist',detail:'Verify HPCSA certificate, practice BHF number, patient identification verified at the practice, and consent signed by doctor and patient.',role:'user',sla:2,type:'internal',cond:'s21_by_us'},
+ {code:'3.3',phase:'Regulatory',title:'Prepare and submit application',detail:'Complete the application in the prescribing doctor\u2019s name as applicant and submit to SAHPRA.',role:'user',sla:8,type:'internal',cond:'s21_by_us'},
+ {code:'3.4',phase:'Regulatory',title:'Raise application fee payment request',detail:'Submit the internal payment request for the application fee.',role:'user',sla:2,type:'internal',cond:'s21_by_us'},
+ {code:'3.5',phase:'Regulatory',title:'Approve and pay application fee',detail:'Senior manager approves the payment request. Payment made and proof filed.',role:'senior_manager',sla:2,type:'approval',cond:'s21_by_us',approval:'application_fee'},
+ {code:'3.6',phase:'Regulatory',title:'Await SAHPRA outcome',detail:'External wait. Log the SAHPRA reference and record the decision when it arrives.',role:'user',sla:0,type:'external',cond:'s21_by_us'},
+ {code:'3.7',phase:'Regulatory',title:'Obtain approval from practice',detail:'External wait. The practice submits its own application and provides the approval reference.',role:'user',sla:0,type:'external',cond:'s21_by_practice'},
+ {code:'3.8',phase:'Regulatory',title:'Confirm outcome with practice',detail:'Confirm approval or rejection in writing. A rejection closes the request.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'4.1',phase:'Listing',title:'Check for existing NAPPI code',detail:'Check whether a NAPPI code already exists for the product and strength from prior supply.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'4.2',phase:'Listing',title:'Apply for NAPPI code',detail:'Apply for the code on behalf of the licensed partner. Skipped if a code already exists.',role:'user',sla:2,type:'internal',cond:'nappi_missing'},
+ {code:'4.3',phase:'Listing',title:'Await NAPPI issue',detail:'External wait. Record the NAPPI code once issued.',role:'user',sla:0,type:'external',cond:'nappi_missing'},
+ {code:'4.4',phase:'Listing',title:'Submit listing to partner pharmacy',detail:'Submit the listing to Dis-Chem Oncology, and to Unisolve where applicable.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'4.5',phase:'Listing',title:'Confirm listing live',detail:'External wait. Confirm the product is listed and orderable.',role:'user',sla:0,type:'external',cond:'always'},
+ {code:'5.1',phase:'Funding',title:'Practice applies for authorisation',detail:'External wait. The practice applies to the medical aid using the NAPPI code.',role:'user',sla:0,type:'external',cond:'always'},
+ {code:'5.2',phase:'Funding',title:'Confirm funding secured',detail:'Record authorisation received, or confirmed payment by the patient. No stock is committed before this step.',role:'user',sla:0,type:'external',cond:'always',gate:true},
+ {code:'6.1',phase:'Fulfilment',title:'Place order with supplier',detail:'Place the order and confirm acknowledgement.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'6.2',phase:'Fulfilment',title:'Raise stock payment request',detail:'Submit the internal payment request against the supplier invoice, or book it to the monthly account.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'6.3',phase:'Fulfilment',title:'Approve and settle supplier invoice',detail:'Senior manager approves payment. Settle per the internal payment process.',role:'senior_manager',sla:2,type:'approval',cond:'always',approval:'supplier_payment'},
+ {code:'6.4',phase:'Fulfilment',title:'Request packing list',detail:'Obtain the packing list and shipping documents from the supplier.',role:'user',sla:8,type:'internal',cond:'always'},
+ {code:'6.5',phase:'Fulfilment',title:'Obtain delivery quotes',detail:'Obtain delivery quotes from the supplier and from the approved courier list.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'6.6',phase:'Fulfilment',title:'Senior manager approves courier',detail:'Senior manager selects and approves the courier.',role:'senior_manager',sla:2,type:'approval',cond:'always',approval:'courier'},
+ {code:'6.7',phase:'Fulfilment',title:'Confirm lead time',detail:'Confirm the delivery lead time and communicate it to the practice.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'6.8',phase:'Fulfilment',title:'Confirm delivery',detail:'External wait. Confirm goods delivered and received in good order.',role:'user',sla:0,type:'external',cond:'always'},
+ {code:'7.1',phase:'Closure',title:'Hand over sale to partner pharmacy',detail:'Hand the sale to Dis-Chem Oncology and confirm in writing.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'7.2',phase:'Closure',title:'Close request and raise invoice line',detail:'Close the request and generate the invoice line item for billing.',role:'user',sla:2,type:'internal',cond:'always'}
+];
+const PHASES = ['Intake','Sourcing','Regulatory','Listing','Funding','Fulfilment','Closure'];
+const CHECKLIST = [
+ 'Doctor\u2019s HPCSA certificate','Practice\u2019s BHF number','Patient identification, verified at the practice',
+ 'Consent form signed by doctor and patient','Motivation letter from the prescribing doctor',
+ 'GMP certificate for the manufacturing site','Summary of product characteristics',
+ 'Certificate of analysis for the batch, where available','Proof of registration in the country of origin'
+];
+const QUIZ = [
+ {q:'Who is recorded as the applicant on a Section 21 application?',o:['Our company','The prescribing doctor','The partner pharmacy','The supplier'],a:1},
+ {q:'What may be entered in the patient reference field?',o:['Full name and ID number','Initials and date of birth','A pseudonymous reference only','The medical aid number'],a:2},
+ {q:'Which step must be complete before any stock is ordered?',o:['Pricing sign-off','NAPPI code issued','Funding confirmed at 5.2','Packing list received'],a:2},
+ {q:'What does the system record when pricing is approved?',o:['The approved price','The decision only','The supplier quote','The margin'],a:1},
+ {q:'What is offered for payment in cash up front?',o:['5% off, no cap','10% off, capped at six months of usage','10% off, unlimited','Free delivery'],a:1},
+ {q:'Who may approve a payment request?',o:['Any team member','The person who raised it','A senior manager other than the person who raised it','The practice'],a:2},
+ {q:'Suppliers who have not responded to an RFQ must be followed up within:',o:['2 hours','8 hours','24 hours','5 days'],a:2},
+ {q:'How are external wait steps treated?',o:['Same business-hour SLA as internal steps','Tracked as open waits, no business-hour SLA','Ignored','Closed automatically after 48 hours'],a:1},
+ {q:'Before submitting the application, which set must be checked?',o:['Supplier quotes','HPCSA certificate, BHF number, patient identification verified, signed consent','Courier quotes','NAPPI code'],a:1},
+ {q:'What happens at the end of the workflow?',o:['We dispense to the patient','We invoice the medical aid','The sale is handed to the partner pharmacy and the request is closed with an invoice line','The file is deleted'],a:2}
+];
+const PASS_MARK = 0.8;
+
+/* ---------------------------------------------------------------- data layer */
+let sb = null, DEMO = true;
+const mem = {profiles:[],practices:[],doctors:[],representatives:[],suppliers:[],couriers:[],
+  requests:[],tasks:[],rfq_items:[],approvals:[],audit_log:[],invoice_lines:[],training_attempts:[]};
+let seqNo = 1;
+const uid = () => 'id' + Math.random().toString(36).slice(2, 10);
+
+async function boot(){
+  if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY){
+    try{
+      const m = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      sb = m.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+      DEMO = false;
+    }catch(e){ console.error('Supabase client failed to load, staying in demo mode', e); }
+  }
+  if (DEMO) seedDemo();
+  await restoreSession();
+  render();
+}
+
+const db = {
+  async list(table, filters){
+    if (DEMO){
+      let rows = mem[table].slice();
+      if (filters) for (const [k,v] of Object.entries(filters)) rows = rows.filter(r => r[k] === v);
+      return rows;
+    }
+    let q = sb.from(table).select('*');
+    if (filters) for (const [k,v] of Object.entries(filters)) q = q.eq(k,v);
+    const {data,error} = await q; if (error) throw error; return data;
+  },
+  async insert(table, row){
+    if (DEMO){
+      const rows = Array.isArray(row) ? row : [row];
+      const out = rows.map(r => ({id:uid(), created_at:new Date().toISOString(), ...r}));
+      mem[table].push(...out); return out;
+    }
+    const {data,error} = await sb.from(table).insert(row).select(); if (error) throw error; return data;
+  },
+  async update(table, id, patch){
+    if (DEMO){ const r = mem[table].find(x=>x.id===id); Object.assign(r, patch); return r; }
+    const {data,error} = await sb.from(table).update(patch).eq('id',id).select(); if (error) throw error; return data[0];
+  },
+  async remove(table, id){
+    if (DEMO){ mem[table] = mem[table].filter(x=>x.id!==id); return; }
+    const {error} = await sb.from(table).delete().eq('id',id); if (error) throw error;
+  }
+};
+
+/* ---------------------------------------------------------------- session */
+let ME = null;
+let cache = {};
+
+async function restoreSession(){
+  if (DEMO) return;
+  const {data} = await sb.auth.getSession();
+  if (data.session){
+    const rows = await db.list('profiles', {id: data.session.user.id});
+    ME = rows[0] || null;
+  }
+}
+async function refresh(){
+  if (!ME) return;
+  const t = ['profiles','practices','doctors','representatives','suppliers','couriers','requests','tasks','rfq_items','approvals','audit_log','invoice_lines','training_attempts'];
+  const res = await Promise.all(t.map(x => db.list(x)));
+  t.forEach((k,i)=> cache[k] = res[i]);
+}
+const isMgr = () => ME && (ME.role === 'senior_manager' || ME.role === 'admin');
+const isAdmin = () => ME && ME.role === 'admin';
+const mine = r => r.owner_id === ME.id;
+const visible = list => isMgr() ? list : list.filter(mine);
+
+/* ---------------------------------------------------------------- time */
+const BH_START = 8, BH_END = 17;                    // SAST working day
+function addBusinessHours(from, hours){
+  let d = new Date(from), left = Number(hours) || 0;
+  const jumpIn = () => {
+    while (d.getDay() === 0 || d.getDay() === 6){ d.setDate(d.getDate()+1); d.setHours(BH_START,0,0,0); }
+    if (d.getHours() < BH_START) d.setHours(BH_START,0,0,0);
+    if (d.getHours() >= BH_END){ d.setDate(d.getDate()+1); d.setHours(BH_START,0,0,0); jumpIn(); }
+  };
+  jumpIn();
+  while (left > 0){
+    const endOfDay = new Date(d); endOfDay.setHours(BH_END,0,0,0);
+    const avail = (endOfDay - d) / 3600000;
+    if (left <= avail){ d = new Date(d.getTime() + left*3600000); left = 0; }
+    else { left -= avail; d = new Date(endOfDay); d.setDate(d.getDate()+1); d.setHours(BH_START,0,0,0); jumpIn(); }
+  }
+  return d.toISOString();
+}
+const fmtDT = s => !s ? '' : new Date(s).toLocaleString('en-ZA',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false});
+const fmtD  = s => !s ? '' : new Date(s).toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'});
+const overdue = t => t.due_at && !['done','na'].includes(t.status) && new Date(t.due_at) < new Date();
+
+/* ---------------------------------------------------------------- audit */
+async function log(action, opts = {}){
+  const row = {request_id: opts.request_id || null, entity: opts.entity || 'system', entity_id: opts.entity_id || null,
+    action, detail: opts.detail || null, actor_id: ME.id, actor_name: ME.full_name};
+  await db.insert('audit_log', row);
+}
+
+/* ---------------------------------------------------------------- demo seed */
+function seedDemo(){
+  const admin = {id:'u-admin', full_name:'James Brittain', email:'james@example.co.za', role:'admin', active:true};
+  const mgr   = {id:'u-mgr',   full_name:'Senior Manager', email:'manager@example.co.za', role:'senior_manager', active:true};
+  const user  = {id:'u-user',  full_name:'Team Member',    email:'team@example.co.za',    role:'user', active:true};
+  mem.profiles.push(admin, mgr, user);
+  const sup = [['3s Corporation','India','Larissa Dsilva','sales1@3scorporation.com'],
+    ['Parksley Global','India','Rohit Kawedia','rohit.kawedia@parksleyglobal.com'],
+    ['Straal Pharma','Netherlands','Hadeel Khalaf','hadeel.khalaf@straalpharma.com'],
+    ['Lenus Healthcare','Germany','Dr Negin Rikan','nego.rikan@lenus-healthcare.de'],
+    ['Euro Biom','United Kingdom','Shikhar Bhatt','work@eurobiom.co.uk'],
+    ['Specialty Script Rx','United States','Suzanne Gonullu','suzanne@specialtyscriptrx.com'],
+    ['Prime Pharmacare','United Kingdom','Khyati Patel','khyati@primepharmacare.com'],
+    ['M Care Exports','United Kingdom','Dr Rajat Bhatt','info@mcareexports.com'],
+    ['GlobalRx','United States','Karen Hamlett','karen@globalrx.com'],
+    ['SyriMed','United Kingdom','Kishan Pankhania','kishan.pankhania@syrimed.co.uk'],
+    ['NSL Group','United Kingdom','Aman Patel','aman@nslgroup.co.uk'],
+    ['Smartway','United Kingdom','Amit Shah','amit.shah@smartwaypharma.com'],
+    ['Tecrapharm','Germany','Gina Alper','gina.alper@tecrapharm.com'],
+    ['Logan Pharmaceuticals','United Kingdom','Abid Mohammed','abid@loganpharmaceuticals.co.uk'],
+    ['Wembrace','India','Gaurav Aurora','gaurav.panwar@wembrace.in'],
+    ['Orifarm','Germany','Frederik Larsen','frela@orifarm.com'],
+    ['UniPhar','Ireland','','pharmasource2@uniphar.ie'],
+    ['Criyuka','South Africa','Lucrisha Naicker','lucrisha@criyuka.co.za']];
+  sup.forEach(s => mem.suppliers.push({id:uid(), name:s[0], country:s[1], contact_name:s[2], email:s[3], tel:'', mobile:'', website:'', active:true}));
+  [['Rudi',false],['DHL',false],['WorldCourier',true]].forEach(c =>
+    mem.couriers.push({id:uid(), name:c[0], cold_chain:c[1], active:true, contact_name:'', contact_number:'', email:''}));
+  const p = {id:uid(), name:'Sandton Oncology Centre', bhf_number:'0123456', city:'Johannesburg', phone:'011 555 0100', email:'admin@sandtononc.co.za', active:true, owner_id:'u-user'};
+  mem.practices.push(p);
+  mem.doctors.push({id:uid(), practice_id:p.id, full_name:'Dr A Naidoo', hpcsa_number:'MP0123456', speciality:'Medical oncology', email:'naidoo@sandtononc.co.za', phone:'', active:true, owner_id:'u-user'});
+  mem.representatives.push({id:uid(), practice_id:p.id, full_name:'K Mokoena', company:'Practice manager', email:'k.mokoena@sandtononc.co.za', phone:'', active:true, owner_id:'u-user'});
+}
+
+/* ---------------------------------------------------------------- render root */
+const $app = document.getElementById('app');
+let route = {view:'dash', id:null};
+let toastTimer = null;
+function toast(msg){
+  document.querySelectorAll('.toast').forEach(n=>n.remove());
+  const el = document.createElement('div'); el.className='toast'; el.textContent = msg;
+  document.body.appendChild(el); clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.remove(), 2600);
+}
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const go = (view, id=null) => { route = {view, id}; render(); };
+
+async function render(){
+  if (!ME){ $app.innerHTML = authView(); wireAuth(); return; }
+  await refresh();
+  const v = route.view;
+  const body =
+    v === 'dash'      ? dashView() :
+    v === 'requests'  ? requestsView() :
+    v === 'request'   ? requestView(route.id) :
+    v === 'newreq'    ? newRequestView() :
+    v === 'customers' ? customersView() :
+    v === 'suppliers' ? suppliersView() :
+    v === 'calc'      ? calcView() :
+    v === 'sop'       ? sopView() :
+    v === 'training'  ? trainingView() :
+    v === 'records'   ? recordsView() :
+    v === 'admin'     ? adminView() : dashView();
+  $app.innerHTML = `<div class="shell">${sideView()}<main class="main">${body}</main></div>`;
+  wire();
+}
+
+/* ---------------------------------------------------------------- auth */
+function authView(){
+  return `<div style="max-width:400px;margin:9vh auto;padding:0 16px">
+    <div style="margin-bottom:18px">
+      <span class="eyebrow">Section 21 named-patient facilitation</span>
+      <h1 style="margin-top:6px">Request Manager</h1>
+    </div>
+    <div class="card"><div class="body">
+      ${DEMO ? `<div class="banner" style="margin-bottom:14px">Demo mode. No backend is configured, so data lives in this browser tab only. Add your Supabase URL and key at the top of index.html to run for real.</div>
+        <div class="field"><label>Sign in as</label><select id="demorole">
+          <option value="u-user">Team Member, user</option>
+          <option value="u-mgr">Senior Manager</option>
+          <option value="u-admin">James Brittain, admin</option></select></div>
+        <button class="btn" id="demogo" style="width:100%">Open the demo</button>`
+      : `<div id="authmode">
+          <div class="field"><label>Full name</label><input id="a-name" placeholder="Only needed to register"></div>
+          <div class="field"><label>Work email</label><input id="a-email" type="email" autocomplete="username"></div>
+          <div class="field"><label>Password</label><input id="a-pass" type="password" autocomplete="current-password"></div>
+          <div class="row"><button class="btn" id="a-in">Sign in</button><button class="btn ghost" id="a-up">Register</button></div>
+          <p class="hint">New accounts start with the team member role. An admin assigns roles.</p>
+        </div>`}
+    </div></div>
+    <p class="small muted" style="margin-top:12px">SOP version ${SOP_VERSION}, effective ${fmtD(SOP_EFFECTIVE)}</p>
+  </div>`;
+}
+function wireAuth(){
+  const g = id => document.getElementById(id);
+  if (DEMO){
+    g('demogo').onclick = async () => { ME = mem.profiles.find(p => p.id === g('demorole').value); go('dash'); };
+    return;
+  }
+  g('a-in').onclick = async () => {
+    const {error} = await sb.auth.signInWithPassword({email:g('a-email').value.trim(), password:g('a-pass').value});
+    if (error) return toast(error.message);
+    await restoreSession(); go('dash');
+  };
+  g('a-up').onclick = async () => {
+    const name = g('a-name').value.trim();
+    if (!name) return toast('Enter your full name to register');
+    const {error} = await sb.auth.signUp({email:g('a-email').value.trim(), password:g('a-pass').value, options:{data:{full_name:name}}});
+    if (error) return toast(error.message);
+    toast('Account created. Check your email if confirmation is required, then sign in.');
+  };
+}
+
+/* ---------------------------------------------------------------- sidebar */
+function myTasks(){
+  const reqs = visible(cache.requests.filter(r => r.status === 'open')).map(r => r.id);
+  return cache.tasks.filter(t => reqs.includes(t.request_id) && !['done','na'].includes(t.status));
+}
+function actionable(){
+  const open = cache.requests.filter(r => r.status === 'open');
+  return cache.tasks.filter(t => {
+    const r = open.find(x => x.id === t.request_id); if (!r) return false;
+    if (['done','na'].includes(t.status)) return false;
+    if (t.sla_type === 'external') return false;
+    if (t.role_required === 'senior_manager') return isMgr();
+    return r.owner_id === ME.id || isMgr();
+  });
+}
+function sideView(){
+  const od = actionable().filter(overdue).length;
+  const open = visible(cache.requests.filter(r=>r.status==='open')).length;
+  const item = (v,label,pill,cls='q') => `<button data-go="${v}" class="${route.view===v||(v==='requests'&&route.view==='request')?'on':''}">${label}${pill?`<span class="pill ${cls}">${pill}</span>`:''}</button>`;
+  return `<aside class="side">
+    <div class="brand"><span>Section 21</span><b>Request Manager</b></div>
+    <nav class="nav">
+      ${item('dash','Dashboard', od||'', 'pill')}
+      ${item('requests','Requests', open)}
+      ${item('customers','Customers')}
+      ${item('suppliers','Suppliers and couriers')}
+      ${item('calc','Pricing calculator')}
+      ${item('sop','SOP v'+SOP_VERSION)}
+      ${item('training','Training')}
+      ${item('records','Records and export')}
+      ${isAdmin()?item('admin','Admin'):''}
+    </nav>
+    <div class="whoami"><b>${esc(ME.full_name)}</b>
+      <span class="muted">${ME.role.replace('_',' ')}${DEMO?' , demo':''}</span>
+      <div style="margin-top:8px"><button class="btn ghost sm" id="signout">Sign out</button></div>
+    </div>
+  </aside>`;
+}
+
+/* ---------------------------------------------------------------- dashboard */
+function dashView(){
+  const acts = actionable();
+  const od = acts.filter(overdue);
+  const waiting = myTasks().filter(t => t.sla_type === 'external');
+  const openReqs = visible(cache.requests.filter(r => r.status === 'open'));
+  const approvals = acts.filter(t => t.sla_type === 'approval');
+
+  const taskRows = list => list.length ? `<table><thead><tr><th>Ref</th><th>Step</th><th>Action</th><th>Owner</th><th>Due</th></tr></thead><tbody>
+    ${list.sort((a,b)=>(a.due_at||'')<(b.due_at||'')?-1:1).map(t=>{
+      const r = cache.requests.find(x=>x.id===t.request_id);
+      const o = cache.profiles.find(p=>p.id===r.owner_id);
+      return `<tr style="cursor:pointer" data-open="${r.id}">
+        <td class="mono">${esc(r.ref)}</td><td class="mono small">${t.step_code}</td>
+        <td>${esc(t.title)}<div class="small muted">${esc(r.product_name)}</div></td>
+        <td class="small">${esc(o?o.full_name:'')}</td>
+        <td class="small ${overdue(t)?'':''}">${t.due_at?`<span class="tag ${overdue(t)?'t-red':'t-grey'}">${fmtDT(t.due_at)}</span>`:'<span class="muted">not started</span>'}</td>
+      </tr>`;}).join('')}</tbody></table>` : `<div class="empty">Nothing outstanding.</div>`;
+
+  const team = isMgr() ? `<div class="card" style="margin-top:14px"><header><h2>Team workload</h2><span class="small muted">Everyone, all open requests</span></header>
+    <table><thead><tr><th>Team member</th><th>Role</th><th>Open requests</th><th>Open tasks</th><th>Overdue</th></tr></thead><tbody>
+    ${cache.profiles.filter(p=>p.active!==false).map(p=>{
+      const rs = cache.requests.filter(r=>r.owner_id===p.id && r.status==='open');
+      const ts = cache.tasks.filter(t=>rs.some(r=>r.id===t.request_id) && !['done','na'].includes(t.status) && t.sla_type!=='external');
+      const o = ts.filter(overdue).length;
+      return `<tr><td>${esc(p.full_name)}</td><td class="small muted">${p.role.replace('_',' ')}</td>
+        <td class="mono">${rs.length}</td><td class="mono">${ts.length}</td>
+        <td>${o?`<span class="tag t-red">${o}</span>`:'<span class="mono muted">0</span>'}</td></tr>`;
+    }).join('')}</tbody></table></div>` : '';
+
+  return `<div class="page-head"><div><span class="eyebrow">Dashboard</span><h1>${esc(ME.full_name.split(' ')[0])}, here is what is outstanding</h1></div>
+    <button class="btn" data-go="newreq">New request</button></div>
+  <div class="grid g4" style="margin-bottom:16px">
+    <div class="stat"><span class="eyebrow">Open requests</span><b>${openReqs.length}</b></div>
+    <div class="stat"><span class="eyebrow">Tasks on you</span><b>${acts.length}</b></div>
+    <div class="stat"><span class="eyebrow">Overdue</span><b style="color:${od.length?'var(--red)':'inherit'}">${od.length}</b></div>
+    <div class="stat"><span class="eyebrow">Waiting on others</span><b style="color:var(--violet)">${waiting.length}</b></div>
+  </div>
+  ${approvals.length?`<div class="card" style="margin-bottom:14px;border-color:#E9D3A9">
+    <header><h2>Awaiting your approval</h2><span class="tag t-amber">${approvals.length}</span></header>${taskRows(approvals)}</div>`:''}
+  <div class="card"><header><h2>Your next actions</h2><span class="small muted">Business hours, 08:00 to 17:00, Monday to Friday</span></header>
+    ${taskRows(acts.filter(t=>t.sla_type!=='approval'))}</div>
+  <div class="card" style="margin-top:14px"><header><h2>Waiting on third parties</h2><span class="small muted">No SLA clock. Chase manually.</span></header>${taskRows(waiting)}</div>
+  ${team}`;
+}
+
+/* ---------------------------------------------------------------- requests */
+function reqProgress(r){
+  const ts = cache.tasks.filter(t=>t.request_id===r.id);
+  const done = ts.filter(t=>['done','na'].includes(t.status)).length;
+  const next = ts.filter(t=>!['done','na'].includes(t.status)).sort((a,b)=>a.seq-b.seq)[0];
+  return {done, total: ts.length, next, ts};
+}
+function requestsView(){
+  const rows = visible(cache.requests).sort((a,b)=> a.created_at < b.created_at ? 1 : -1);
+  return `<div class="page-head"><div><span class="eyebrow">Requests</span><h1>${isMgr()?'All requests':'Your requests'}</h1></div>
+    <div class="row"><button class="btn ghost" data-export="requests">Export CSV</button><button class="btn" data-go="newreq">New request</button></div></div>
+  <div class="card">${rows.length?`<table><thead><tr><th>Ref</th><th>Product</th><th>Practice</th><th>Owner</th><th>Phase</th><th>Progress</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(r=>{
+      const {done,total,next} = reqProgress(r);
+      const pr = cache.practices.find(p=>p.id===r.practice_id);
+      const o = cache.profiles.find(p=>p.id===r.owner_id);
+      const od = cache.tasks.some(t=>t.request_id===r.id && overdue(t) && t.sla_type!=='external');
+      return `<tr style="cursor:pointer" data-open="${r.id}">
+        <td class="mono">${esc(r.ref)}${r.urgent?' <span class="tag t-red">urgent</span>':''}</td>
+        <td>${esc(r.product_name)}<div class="small muted">${esc(r.strength||'')}</div></td>
+        <td class="small">${esc(pr?pr.name:'')}</td>
+        <td class="small">${esc(o?o.full_name:'')}</td>
+        <td><span class="tag t-navy">${next?esc(next.phase):'Complete'}</span></td>
+        <td class="mono small">${done}/${total}${od?' <span class="tag t-red">overdue</span>':''}</td>
+        <td><span class="tag ${r.status==='open'?'t-green':'t-grey'}">${esc(r.status)}</span></td></tr>`;
+    }).join('')}</tbody></table>`:`<div class="empty">No requests yet. Create the first one.</div>`}</div>`;
+}
+
+function newRequestView(){
+  const ps = visible(cache.practices).filter(p=>p.active!==false);
+  return `<div class="page-head"><div><span class="eyebrow">New request</span><h1>Log a request</h1></div>
+    <button class="btn ghost" data-go="requests">Cancel</button></div>
+  <div class="card" style="max-width:760px"><div class="body">
+    <div class="banner" style="margin-bottom:16px">Do not enter patient names, identity numbers or medical aid numbers. Use a pseudonymous reference such as SAN-014. Source documents stay in controlled storage.</div>
+    <div class="grid g2">
+      <div class="field"><label>Practice</label><select id="f-practice">${ps.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select>
+        ${ps.length?'':'<div class="hint">Add a practice under Customers first.</div>'}</div>
+      <div class="field"><label>Doctor</label><select id="f-doctor"></select></div>
+      <div class="field"><label>Representative, optional</label><select id="f-rep"></select></div>
+      <div class="field"><label>Patient reference</label><input id="f-patient" placeholder="SAN-014"></div>
+      <div class="field"><label>Product</label><input id="f-product" placeholder="Ifosfamide"></div>
+      <div class="field"><label>Strength</label><input id="f-strength" placeholder="1 g vial"></div>
+      <div class="field"><label>Pack size</label><input id="f-pack" placeholder="1 vial per pack"></div>
+      <div class="field"><label>Quantity required</label><input id="f-qty" placeholder="54 packs"></div>
+      <div class="field"><label>Required by</label><input id="f-by" type="date"></div>
+      <div class="field"><label>Who prepares the Section 21 application</label>
+        <select id="f-s21"><option value="us">We prepare and submit it</option><option value="practice">The practice submits it</option></select></div>
+    </div>
+    <div class="field"><label><input type="checkbox" id="f-urgent" style="width:auto;margin-right:6px">Urgent case</label></div>
+    <button class="btn" id="f-save">Create request</button>
+  </div></div>`;
+}
+
+async function createRequest(){
+  const g = id => document.getElementById(id);
+  const practice_id = g('f-practice').value, doctor_id = g('f-doctor').value;
+  if (!practice_id || !doctor_id) return toast('Select a practice and doctor');
+  if (!g('f-patient').value.trim()) return toast('Enter a patient reference');
+  if (!g('f-product').value.trim()) return toast('Enter the product');
+  const s21 = g('f-s21').value === 'us';
+  const ref = DEMO ? 'S21-2026-' + String(seqNo++).padStart(4,'0') : undefined;
+  const row = {practice_id, doctor_id, representative_id: g('f-rep').value || null,
+    patient_ref: g('f-patient').value.trim(), product_name: g('f-product').value.trim(),
+    strength: g('f-strength').value.trim(), pack_size: g('f-pack').value.trim(),
+    quantity: g('f-qty').value.trim(), required_by: g('f-by').value || null,
+    urgent: g('f-urgent').checked, s21_by_us: s21, status:'open', owner_id: ME.id, sop_version: SOP_VERSION};
+  if (ref) row.ref = ref;
+  const [req] = await db.insert('requests', row);
+
+  const steps = STEPS.filter(s => s.cond === 'always' || (s.cond === 's21_by_us' && s21) ||
+    (s.cond === 's21_by_practice' && !s21) || s.cond === 'nappi_missing');
+  const now = new Date().toISOString();
+  const tasks = steps.map((s,i)=>({request_id:req.id, seq:i+1, step_code:s.code, phase:s.phase, title:s.title,
+    detail:s.detail, role_required:s.role, sla_hours:s.sla, sla_type:s.type,
+    status: s.type==='start' ? 'done' : 'pending',
+    completed_at: s.type==='start' ? now : null, completed_by: s.type==='start' ? ME.id : null,
+    due_at: null}));
+  await db.insert('tasks', tasks);
+  await refresh();
+  await advanceDues(req.id);
+  const sups = cache.suppliers.filter(s=>s.active!==false);
+  await db.insert('rfq_items', sups.map(s=>({request_id:req.id, supplier_id:s.id, status:'not_sent', updated_by:ME.id, updated_at:now})));
+  await log('Request created', {request_id:req.id, entity:'request', entity_id:req.ref, detail:`${req.product_name}, Section 21 by ${s21?'us':'practice'}`});
+  toast('Request ' + req.ref + ' created');
+  go('request', req.id);
+}
+
+/* set due dates on the next open internal tasks */
+async function advanceDues(requestId){
+  const ts = cache.tasks.filter(t=>t.request_id===requestId).sort((a,b)=>a.seq-b.seq);
+  const lastDone = ts.filter(t=>t.completed_at).sort((a,b)=> a.completed_at<b.completed_at?1:-1)[0];
+  const from = lastDone ? lastDone.completed_at : new Date().toISOString();
+  for (const t of ts){
+    if (['done','na'].includes(t.status)) continue;
+    if (t.sla_type === 'external'){ if (t.due_at) await db.update('tasks', t.id, {due_at:null}); continue; }
+    if (!t.due_at){ await db.update('tasks', t.id, {due_at: addBusinessHours(from, t.sla_hours)}); }
+    break;
+  }
+  // intake steps 1.2 to 1.5 all run from the start, so clock them together
+  const intake = ts.filter(t=>t.phase==='Intake' && !['done','na'].includes(t.status));
+  for (const t of intake) if (!t.due_at) await db.update('tasks', t.id, {due_at: addBusinessHours(from, t.sla_hours)});
+}
+
+function requestView(id){
+  const r = cache.requests.find(x=>x.id===id);
+  if (!r) return `<div class="empty">Request not found.</div>`;
+  const pr = cache.practices.find(p=>p.id===r.practice_id) || {};
+  const dr = cache.doctors.find(d=>d.id===r.doctor_id) || {};
+  const rep = cache.representatives.find(x=>x.id===r.representative_id);
+  const owner = cache.profiles.find(p=>p.id===r.owner_id) || {};
+  const ts = cache.tasks.filter(t=>t.request_id===id).sort((a,b)=>a.seq-b.seq);
+  const nextOpen = ts.find(t=>!['done','na'].includes(t.status));
+
+  const spine = PHASES.map(ph=>{
+    const g = ts.filter(t=>t.phase===ph); if (!g.length) return '';
+    const done = g.filter(t=>['done','na'].includes(t.status)).length;
+    const ext = g.every(t=>t.sla_type==='external');
+    const isNow = nextOpen && nextOpen.phase===ph;
+    const cls = ['seg', done===g.length?'fill':'', isNow?'now':'', ext?'ext':''].join(' ');
+    return `<div class="${cls}"><div class="rail"></div><span class="ph">${ph}</span><span class="ct mono">${done}/${g.length}</span></div>`;
+  }).join('');
+
+  const canAct = t => {
+    if (r.status !== 'open') return false;
+    if (t.role_required === 'senior_manager') return isMgr();
+    return r.owner_id === ME.id || isMgr();
+  };
+  const taskRow = t => {
+    const cls = ['task', t.status==='done'?'done':'', t.status==='na'?'na':'', overdue(t)?'overdue':''].join(' ');
+    const by = cache.profiles.find(p=>p.id===t.completed_by);
+    const tagT = t.sla_type==='approval'?'t-amber':t.sla_type==='external'?'t-violet':'t-grey';
+    return `<div class="${cls}">
+      <div class="code">${t.step_code}</div>
+      <div>
+        <h4>${esc(t.title)} ${t.sla_type==='approval'?'<span class="tag t-amber">approval</span>':''}${t.sla_type==='external'?'<span class="tag t-violet">external wait</span>':''}</h4>
+        <div class="det">${esc(t.detail)}</div>
+        <div class="meta">
+          <span class="tag ${tagT}">${t.sla_type==='external'?'no SLA':t.sla_hours+' h'}</span>
+          ${t.role_required==='senior_manager'?'<span>senior manager</span>':''}
+          ${t.due_at&&!['done','na'].includes(t.status)?`<span class="${overdue(t)?'':''}">due ${fmtDT(t.due_at)}${overdue(t)?' , overdue':''}</span>`:''}
+          ${t.completed_at?`<span>done ${fmtDT(t.completed_at)} by ${esc(by?by.full_name:'')}</span>`:''}
+        </div>
+        ${t.comment?`<div class="cmt">${esc(t.comment)}</div>`:''}
+      </div>
+      <div class="acts">
+        ${['done','na'].includes(t.status)||!canAct(t)?'':`
+          <button class="btn sm" data-done="${t.id}">${t.sla_type==='approval'?'Record decision':'Mark done'}</button>
+          <button class="btn ghost sm" data-note="${t.id}">Note</button>
+          <button class="btn ghost sm" data-na="${t.id}">N/A</button>`}
+        ${t.status==='done'?'<span class="tag t-green">done</span>':''}
+        ${t.status==='na'?'<span class="tag t-grey">n/a</span>':''}
+      </div></div>`;
+  };
+
+  const rfq = cache.rfq_items.filter(q=>q.request_id===id);
+  const rfqTable = `<table><thead><tr><th>Supplier</th><th>Country</th><th>Status</th><th>Comment</th><th></th></tr></thead><tbody>
+    ${rfq.map(q=>{ const s = cache.suppliers.find(x=>x.id===q.supplier_id)||{};
+      const cls = {quoted:'t-green', declined:'t-grey', no_response:'t-red', sent:'t-navy', followed_up:'t-amber', not_sent:'t-grey'}[q.status];
+      return `<tr><td>${esc(s.name)}</td><td class="small muted">${esc(s.country||'')}</td>
+        <td><span class="tag ${cls}">${q.status.replace('_',' ')}</span></td>
+        <td class="small">${esc(q.comment||'')}</td>
+        <td style="text-align:right">${r.status==='open'?`<select data-rfq="${q.id}" style="width:auto;padding:3px 6px;font-size:12px">
+          ${['not_sent','sent','followed_up','quoted','declined','no_response'].map(o=>`<option value="${o}" ${o===q.status?'selected':''}>${o.replace('_',' ')}</option>`).join('')}
+        </select>`:''}</td></tr>`;}).join('')}</tbody></table>`;
+
+  const apps = cache.approvals.filter(a=>a.request_id===id);
+  const logs = cache.audit_log.filter(a=>a.request_id===id).sort((a,b)=> a.created_at<b.created_at?1:-1);
+
+  return `<div class="page-head">
+    <div><span class="eyebrow">${esc(r.ref)} , ${esc(owner.full_name||'')}</span>
+      <h1>${esc(r.product_name)} ${esc(r.strength||'')}</h1>
+      <p class="small muted" style="margin:4px 0 0">${esc(pr.name||'')} , ${esc(dr.full_name||'')}${rep?' , via '+esc(rep.full_name):''} , patient ${esc(r.patient_ref)}</p></div>
+    <div class="row">
+      <button class="btn ghost" data-go="requests">Back</button>
+      ${r.status==='open'?`<button class="btn ghost" data-hold="${r.id}">Put on hold</button><button class="btn ghost" data-close="${r.id}">Close request</button>`:`<span class="tag t-grey">${esc(r.status)}</span>`}
+    </div></div>
+
+  <div class="card" style="margin-bottom:14px"><div class="body">
+    <div class="spine">${spine}</div>
+    <div class="row small muted" style="margin-top:8px;gap:16px">
+      <span><span class="tag t-green">solid</span> time you control</span>
+      <span><span class="tag t-violet">dashed</span> time a third party controls</span>
+      ${r.required_by?`<span>required by ${fmtD(r.required_by)}</span>`:''}
+      <span>Section 21 by ${r.s21_by_us?'us':'the practice'}</span>
+      ${r.nappi_code?`<span>NAPPI ${esc(r.nappi_code)}</span>`:''}
+      ${r.sahpra_ref?`<span>SAHPRA ${esc(r.sahpra_ref)}</span>`:''}
+    </div>
+  </div></div>
+
+  <div class="card" style="margin-bottom:14px"><header><h2>Workflow</h2>
+    <span class="small muted">${ts.filter(t=>['done','na'].includes(t.status)).length} of ${ts.length} complete</span></header>
+    ${ts.map(taskRow).join('')}</div>
+
+  <div class="grid g2">
+    <div class="card"><header><h2>RFQ tracker</h2><span class="small muted">Emails are sent from Outlook. Log the outcome here.</span></header>${rfqTable}</div>
+    <div>
+      <div class="card"><header><h2>Approvals</h2></header>
+        ${apps.length?`<table><thead><tr><th>Type</th><th>Decision</th><th>By</th><th>When</th></tr></thead><tbody>
+        ${apps.map(a=>{const p=cache.profiles.find(x=>x.id===a.decided_by)||{};
+          return `<tr><td class="small">${a.kind.replace('_',' ')}</td>
+            <td><span class="tag ${a.decision==='approved'?'t-green':'t-red'}">${a.decision}</span></td>
+            <td class="small">${esc(p.full_name||'')}</td><td class="small mono">${fmtDT(a.decided_at)}</td></tr>`;}).join('')}
+        </tbody></table>`:`<div class="empty">No decisions recorded.</div>`}
+        <div class="body" style="border-top:1px solid var(--rule-2)"><p class="small muted" style="margin:0">Prices are never stored. Only the decision, the decider and the time are kept.</p></div>
+      </div>
+      <div class="card" style="margin-top:14px"><header><h2>Activity</h2>
+        <button class="btn ghost sm" data-export="audit-${r.id}">Export CSV</button></header>
+        <div class="body" style="max-height:320px;overflow:auto">
+        ${logs.length?logs.map(l=>`<div style="padding:6px 0;border-bottom:1px solid var(--rule-2)">
+          <div class="small"><b>${esc(l.action)}</b>${l.detail?' , '+esc(l.detail):''}</div>
+          <div class="small muted mono">${fmtDT(l.created_at)} , ${esc(l.actor_name||'')}</div></div>`).join(''):'<p class="muted small">Nothing logged yet.</p>'}
+        </div></div>
+    </div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- task actions */
+async function completeTask(taskId){
+  const t = cache.tasks.find(x=>x.id===taskId);
+  const r = cache.requests.find(x=>x.id===t.request_id);
+  const step = STEPS.find(s=>s.code===t.step_code);
+
+  if (step && step.approval){
+    modal(`Record decision, ${t.title}`, `
+      <div class="field"><label>Decision</label><select id="m-dec"><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div>
+      <div class="field"><label>Note, optional. Do not record prices.</label><textarea id="m-note" placeholder="Reference, condition or reason"></textarea></div>`,
+      async () => {
+        const dec = document.getElementById('m-dec').value, note = document.getElementById('m-note').value.trim();
+        await db.insert('approvals', {request_id:r.id, kind:step.approval, decision:dec, note:note||null, decided_by:ME.id, decided_at:new Date().toISOString()});
+        await finish(t, dec === 'approved' ? note : 'Rejected. ' + note);
+        await log(`${step.approval.replace('_',' ')} ${dec}`, {request_id:r.id, entity:'approval', entity_id:t.step_code, detail:note});
+        if (dec === 'rejected') toast('Rejection recorded. The step stays closed, reopen the request flow manually if needed.');
+      });
+    return;
+  }
+  if (t.step_code === '4.1'){
+    modal('Does a NAPPI code already exist?', `
+      <div class="field"><label>Existing NAPPI code</label><select id="m-nappi"><option value="no">No, we must apply</option><option value="yes">Yes, it already exists</option></select></div>
+      <div class="field"><label>NAPPI code, if known</label><input id="m-code" placeholder="e.g. 712345001"></div>`,
+      async () => {
+        const exists = document.getElementById('m-nappi').value === 'yes';
+        const code = document.getElementById('m-code').value.trim();
+        await db.update('requests', r.id, {nappi_exists: exists, nappi_code: code || null});
+        if (exists){
+          for (const x of cache.tasks.filter(x=>x.request_id===r.id && ['4.2','4.3'].includes(x.step_code)))
+            await db.update('tasks', x.id, {status:'na', comment:'NAPPI code already exists', completed_at:new Date().toISOString(), completed_by:ME.id});
+        }
+        await finish(t, exists ? 'Existing code ' + code : 'No code, application required');
+        await log('NAPPI check', {request_id:r.id, entity:'request', entity_id:r.ref, detail: exists?'exists, '+code:'none, applying'});
+      });
+    return;
+  }
+  if (t.step_code === '3.6' || t.step_code === '3.7'){
+    modal('Record the SAHPRA outcome', `
+      <div class="field"><label>Outcome</label><select id="m-out"><option value="approved">Approved</option><option value="rejected">Rejected</option></select></div>
+      <div class="field"><label>SAHPRA reference</label><input id="m-ref"></div>`,
+      async () => {
+        const out = document.getElementById('m-out').value, ref = document.getElementById('m-ref').value.trim();
+        await db.update('requests', r.id, {sahpra_ref: ref || null});
+        await finish(t, out + (ref ? ', ' + ref : ''));
+        await log('SAHPRA outcome ' + out, {request_id:r.id, entity:'request', entity_id:r.ref, detail:ref});
+      });
+    return;
+  }
+  if (t.step_code === '7.2'){
+    modal('Close the request and raise the invoice line', `
+      <div class="field"><label>Invoice description</label><input id="m-desc" value="Section 21 facilitation, ${esc(r.product_name)} ${esc(r.strength||'')}"></div>
+      <div class="field"><label>Note</label><input id="m-note2" placeholder="Optional reference"></div>`,
+      async () => {
+        await db.insert('invoice_lines', {request_id:r.id, ref:r.ref, description:document.getElementById('m-desc').value.trim(),
+          practice:(cache.practices.find(p=>p.id===r.practice_id)||{}).name, doctor:(cache.doctors.find(d=>d.id===r.doctor_id)||{}).full_name,
+          patient_ref:r.patient_ref, occurred_on:new Date().toISOString().slice(0,10), billable:true, created_by:ME.id});
+        await db.update('requests', r.id, {status:'closed', closed_at:new Date().toISOString(), outcome:'completed'});
+        await finish(t, document.getElementById('m-note2').value.trim());
+        await log('Request closed, invoice line raised', {request_id:r.id, entity:'request', entity_id:r.ref});
+      });
+    return;
+  }
+  await finish(t, null);
+  await log('Step complete, ' + t.step_code + ' ' + t.title, {request_id:r.id, entity:'task', entity_id:t.step_code});
+}
+async function finish(t, comment){
+  await db.update('tasks', t.id, {status:'done', completed_at:new Date().toISOString(), completed_by:ME.id,
+    comment: comment ? ((t.comment ? t.comment + ' | ' : '') + comment) : t.comment});
+  await refresh();
+  await advanceDues(t.request_id);
+  await refresh();
+  render();
+}
+
+/* ---------------------------------------------------------------- customers */
+function customersView(){
+  const ps = visible(cache.practices);
+  return `<div class="page-head"><div><span class="eyebrow">Customers</span><h1>Practices, doctors and representatives</h1></div>
+    <div class="row"><button class="btn ghost" data-export="customers">Export CSV</button><button class="btn" data-add="practice">Add practice</button></div></div>
+  ${ps.length ? ps.map(p=>{
+    const ds = cache.doctors.filter(d=>d.practice_id===p.id);
+    const rs = cache.representatives.filter(x=>x.practice_id===p.id);
+    const open = cache.requests.filter(r=>r.practice_id===p.id && r.status==='open').length;
+    return `<div class="card" style="margin-bottom:12px">
+      <header><div><h2>${esc(p.name)}</h2>
+        <span class="small muted">BHF ${esc(p.bhf_number||'not recorded')} , ${esc(p.city||'')} , ${esc(p.email||'')}</span></div>
+        <div class="row"><span class="tag ${open?'t-green':'t-grey'}">${open} open</span>
+        <button class="btn ghost sm" data-add="doctor:${p.id}">Add doctor</button>
+        <button class="btn ghost sm" data-add="rep:${p.id}">Add representative</button>
+        <button class="btn ghost sm" data-del="practices:${p.id}">Remove</button></div></header>
+      <div class="body grid g2">
+        <div><span class="eyebrow">Doctors</span>
+          ${ds.length?ds.map(d=>`<div style="padding:6px 0;border-bottom:1px solid var(--rule-2)" class="row">
+            <div style="flex:1"><b>${esc(d.full_name)}</b><div class="small muted">HPCSA ${esc(d.hpcsa_number||'not recorded')} , ${esc(d.speciality||'')} , ${esc(d.email||'')}</div></div>
+            <button class="btn ghost sm" data-del="doctors:${d.id}">Remove</button></div>`).join(''):'<p class="small muted">None recorded.</p>'}</div>
+        <div><span class="eyebrow">Representatives</span>
+          ${rs.length?rs.map(x=>`<div style="padding:6px 0;border-bottom:1px solid var(--rule-2)" class="row">
+            <div style="flex:1"><b>${esc(x.full_name)}</b><div class="small muted">${esc(x.company||'')} , ${esc(x.email||'')}</div></div>
+            <button class="btn ghost sm" data-del="representatives:${x.id}">Remove</button></div>`).join(''):'<p class="small muted">None recorded.</p>'}</div>
+      </div></div>`;}).join('')
+  : `<div class="card"><div class="empty">No practices yet. Add the first one to start logging requests.</div></div>`}`;
+}
+
+/* ---------------------------------------------------------------- suppliers */
+function suppliersView(){
+  const s = cache.suppliers, c = cache.couriers;
+  return `<div class="page-head"><div><span class="eyebrow">Reference data</span><h1>Suppliers and couriers</h1></div>
+    <div class="row"><button class="btn ghost" data-export="suppliers">Export CSV</button>
+    ${isAdmin()?'<button class="btn" data-add="supplier">Add supplier</button><button class="btn ghost" data-add="courier">Add courier</button>':''}</div></div>
+  ${isAdmin()?'':'<div class="banner" style="margin-bottom:12px">Only an admin can change these lists.</div>'}
+  <div class="card" style="margin-bottom:14px"><header><h2>Suppliers</h2><span class="small muted">${s.filter(x=>x.active!==false).length} active of ${s.length}. Active suppliers are added to the RFQ tracker on every new request.</span></header>
+    <table><thead><tr><th>Supplier</th><th>Country</th><th>Contact</th><th>Email</th><th>Status</th>${isAdmin()?'<th></th>':''}</tr></thead><tbody>
+    ${s.map(x=>`<tr><td>${esc(x.name)}</td><td class="small">${esc(x.country||'')}</td><td class="small">${esc(x.contact_name||'')}</td>
+      <td class="small mono">${esc(x.email||'')}</td>
+      <td><span class="tag ${x.active!==false?'t-green':'t-grey'}">${x.active!==false?'active':'inactive'}</span></td>
+      ${isAdmin()?`<td style="text-align:right"><button class="btn ghost sm" data-toggle="suppliers:${x.id}">${x.active!==false?'Deactivate':'Activate'}</button>
+      <button class="btn ghost sm" data-del="suppliers:${x.id}">Remove</button></td>`:''}</tr>`).join('')}</tbody></table></div>
+  <div class="card"><header><h2>Couriers</h2><span class="small muted">Cold chain capability must be confirmed before use on a temperature-controlled product.</span></header>
+    <table><thead><tr><th>Company</th><th>Contact</th><th>Cold chain</th><th>Status</th>${isAdmin()?'<th></th>':''}</tr></thead><tbody>
+    ${c.map(x=>`<tr><td>${esc(x.name)}</td><td class="small">${esc(x.contact_name||'')} ${esc(x.contact_number||'')}</td>
+      <td>${x.cold_chain?'<span class="tag t-navy">yes</span>':'<span class="tag t-grey">no</span>'}</td>
+      <td><span class="tag ${x.active!==false?'t-green':'t-grey'}">${x.active!==false?'active':'inactive'}</span></td>
+      ${isAdmin()?`<td style="text-align:right"><button class="btn ghost sm" data-toggle="couriers:${x.id}">${x.active!==false?'Deactivate':'Activate'}</button>
+      <button class="btn ghost sm" data-del="couriers:${x.id}">Remove</button></td>`:''}</tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---------------------------------------------------------------- calculator */
+const CALC = {q:[6.5,0,0,0], fx:20.5, uplift:8, margin:60, packsDay:[3,0,0,0], daysCycle:3, cycles:6, fee:400, logistics:2000, discount:10};
+function calcNumbers(){
+  const c = CALC, out = {strength:[]}; let rev=0, cost=0;
+  for (let i=0;i<4;i++){
+    const cogs = c.q[i] * c.fx * (1 + c.uplift/100);
+    const sell = c.margin >= 100 ? 0 : cogs / (1 - c.margin/100);
+    const packs = c.packsDay[i] * c.daysCycle * c.cycles;
+    out.strength.push({cogs, sell, packs, rev: sell*packs, cost: cogs*packs});
+    rev += sell*packs; cost += cogs*packs;
+  }
+  out.rev = rev; out.cost = cost; out.gross = rev - cost;
+  out.net = out.gross - c.fee - c.logistics;
+  out.discRev = rev * (1 - c.discount/100);
+  out.netDisc = out.discRev - cost - c.fee - c.logistics;
+  out.erosion = out.net ? (out.netDisc - out.net) / out.net : 0;
+  out.finance = cost + c.fee + c.logistics;
+  return out;
+}
+const R = n => 'R ' + (Math.round(n*100)/100).toLocaleString('en-ZA',{minimumFractionDigits:2, maximumFractionDigits:2});
+function calcView(){
+  const n = calcNumbers();
+  const open = visible(cache.requests.filter(r=>r.status==='open'));
+  const num = (id,val,step='0.01') => `<input type="number" step="${step}" id="${id}" value="${val}">`;
+  return `<div class="page-head"><div><span class="eyebrow">Working tool</span><h1>Pricing calculator</h1>
+    <p class="small muted" style="margin:4px 0 0">Nothing here is saved. Use it to prepare step 2.4 and to support the sign-off at 2.5.</p></div></div>
+  <div class="grid g2">
+    <div class="card"><header><h2>Inputs</h2></header><div class="body">
+      <div class="grid g4">
+        ${[0,1,2,3].map(i=>`<div class="field"><label>Quote, strength ${i+1}</label>${num('q'+i, CALC.q[i])}</div>`).join('')}
+      </div>
+      <div class="grid g3">
+        <div class="field"><label>FX rate to ZAR</label>${num('fx', CALC.fx, '0.0001')}</div>
+        <div class="field"><label>Landed uplift, %</label>${num('uplift', CALC.uplift, '0.1')}</div>
+        <div class="field"><label>Target margin, %</label>${num('margin', CALC.margin, '0.1')}</div>
+      </div>
+      <div class="grid g4">
+        ${[0,1,2,3].map(i=>`<div class="field"><label>Packs per day, s${i+1}</label>${num('pd'+i, CALC.packsDay[i])}</div>`).join('')}
+      </div>
+      <div class="grid g3">
+        <div class="field"><label>Days per cycle</label>${num('daysCycle', CALC.daysCycle,'1')}</div>
+        <div class="field"><label>Cycles per patient</label>${num('cycles', CALC.cycles,'1')}</div>
+        <div class="field"><label>Cash discount, %</label>${num('discount', CALC.discount,'0.5')}</div>
+      </div>
+      <div class="grid g2">
+        <div class="field"><label>Application fee, ZAR</label>${num('fee', CALC.fee,'1')}</div>
+        <div class="field"><label>Logistics, ZAR</label>${num('logistics', CALC.logistics,'1')}</div>
+      </div>
+      <p class="hint">FX and landed uplift are the two inputs that most often make a quote look better than it is. The senior manager checks both at sign-off.</p>
+    </div></div>
+    <div>
+      <div class="card"><header><h2>Result per patient</h2></header><div class="body">
+        ${[0,1,2,3].filter(i=>CALC.q[i]>0).map(i=>`<div class="calcline"><span class="small">Strength ${i+1}, COGS ${R(n.strength[i].cogs)} , sell ${R(n.strength[i].sell)} , ${n.strength[i].packs} packs</span><b class="small">${R(n.strength[i].rev)}</b></div>`).join('')}
+        <div class="calcline"><span>Revenue per patient</span><b>${R(n.rev)}</b></div>
+        <div class="calcline"><span>Cost per patient</span><b>${R(n.cost)}</b></div>
+        <div class="calcline"><span>Gross profit</span><b>${R(n.gross)}</b></div>
+        <div class="calcline"><span class="muted">Application fee</span><b class="muted">${R(-CALC.fee)}</b></div>
+        <div class="calcline"><span class="muted">Logistics</span><b class="muted">${R(-CALC.logistics)}</b></div>
+        <div class="calcline total"><span><b>Net profit, standard terms</b></span><b>${R(n.net)}</b></div>
+      </div></div>
+      <div class="card" style="margin-top:14px"><header><h2>Cash up front, ${CALC.discount}%</h2></header><div class="body">
+        <div class="calcline"><span>Discounted revenue</span><b>${R(n.discRev)}</b></div>
+        <div class="calcline"><span>Net profit, cash up front</span><b>${R(n.netDisc)}</b></div>
+        <div class="calcline total"><span><b>Effect on net profit</b></span><b style="color:${n.erosion<0?'var(--red)':'var(--green)'}">${(n.erosion*100).toFixed(1)}%</b></div>
+        <p class="hint">A ${CALC.discount}% cut in price removes ${Math.abs(n.erosion*100).toFixed(0)}% of net profit. Cash up front is worth it only if the working capital it frees is worth more than that.</p>
+      </div></div>
+      <div class="card" style="margin-top:14px"><header><h2>Working capital</h2></header><div class="body">
+        <div class="calcline total"><span><b>Finance required up front</b></span><b>${R(n.finance)}</b></div>
+        <p class="hint">Cost of goods plus application fee plus logistics, carried until the partner pharmacy settles.</p>
+      </div></div>
+      ${isMgr()?`<div class="card" style="margin-top:14px"><header><h2>Record a decision</h2></header><div class="body">
+        <div class="field"><label>Request</label><select id="c-req"><option value="">Select a request</option>
+          ${open.map(r=>`<option value="${r.id}">${esc(r.ref)} , ${esc(r.product_name)}</option>`).join('')}</select></div>
+        <div class="row"><button class="btn" id="c-ok">Approve pricing</button><button class="btn ghost" id="c-no">Reject</button></div>
+        <p class="hint">The decision is stored against the request. The numbers above are not.</p>
+      </div></div>`:''}
+    </div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------- SOP */
+function sopView(){
+  const roleLbl = {user:'Team member', senior_manager:'Senior manager'};
+  return `<div class="page-head"><div><span class="eyebrow">Standard operating procedure</span>
+    <h1>Section 21 named-patient facilitation</h1>
+    <p class="small muted" style="margin:4px 0 0">Version ${SOP_VERSION}, effective ${fmtD(SOP_EFFECTIVE)}. Supersedes v1.0 of 23 July 2026.</p></div>
+    <button class="btn ghost" data-export="sop">Export CSV</button></div>
+  <div class="grid g2" style="margin-bottom:14px">
+    <div class="card"><header><h2>Scope</h2></header><div class="body small">
+      <p style="margin-top:0">Facilitation of Section 21 named-patient medicine requests from private practices, from intake through to handover to the partner pharmacy.</p>
+      <p><b>Out of scope.</b> Clinical decisions, prescribing, dispensing, and anything reserved to the licensed partner pharmacy.</p>
+      <p style="margin-bottom:0"><b>Applicant.</b> The prescribing doctor is the applicant on every Section 21 application. We act on their instruction and in their name.</p>
+    </div></div>
+    <div class="card"><header><h2>Rules that apply throughout</h2></header><div class="body small">
+      <ul style="margin:0;padding-left:18px">
+        <li>Patient identity is never stored in this system. Use a pseudonymous reference.</li>
+        <li>Prices are never stored. Only the approval decision is recorded.</li>
+        <li>The person who raises a payment request may not approve it.</li>
+        <li>No stock is committed before funding is confirmed at step 5.2.</li>
+        <li>Internal SLAs run in business hours, 08:00 to 17:00, Monday to Friday.</li>
+        <li>External waits carry no SLA. They are tracked and chased manually.</li>
+      </ul>
+    </div></div>
+  </div>
+  ${PHASES.map(ph=>`<div class="card" style="margin-bottom:12px"><header><h2>${ph}</h2>
+    <span class="small muted">${STEPS.filter(s=>s.phase===ph).length} steps</span></header><div class="body">
+    ${STEPS.filter(s=>s.phase===ph).map(s=>`<div class="sop-step">
+      <div class="mono small muted">${s.code}</div>
+      <div><b>${esc(s.title)}</b>
+        ${s.type==='approval'?'<span class="tag t-amber">approval</span>':''}
+        ${s.type==='external'?'<span class="tag t-violet">external wait</span>':''}
+        ${s.gate?'<span class="tag t-red">gate</span>':''}
+        <div class="small" style="color:var(--ink-2)">${esc(s.detail)}</div>
+        <div class="small muted" style="margin-top:3px">${roleLbl[s.role]}
+          ${s.type==='external'?' , no SLA':s.type==='start'?' , start':' , '+s.sla+' business hours from the previous step'}
+          ${s.cond!=='always'?' , only when '+({s21_by_us:'we prepare the application',s21_by_practice:'the practice prepares the application',nappi_missing:'no NAPPI code exists'})[s.cond]:''}</div>
+      </div></div>`).join('')}
+  </div></div>`).join('')}
+  <div class="card"><header><h2>Section 21 application checklist</h2></header><div class="body">
+    <ol style="margin:0;padding-left:18px" class="small">${CHECKLIST.map(c=>`<li style="margin-bottom:3px">${esc(c)}</li>`).join('')}</ol>
+    <p class="hint">Patient identification is verified at the practice and recorded as verified. Identity documents are not stored here.</p>
+  </div></div>`;
+}
+
+/* ---------------------------------------------------------------- training */
+let quizAnswers = {};
+function trainingView(){
+  const mineA = cache.training_attempts.filter(a=>a.user_id===ME.id).sort((a,b)=>a.attempted_at<b.attempted_at?1:-1);
+  const passed = mineA.find(a=>a.passed && a.sop_version===SOP_VERSION);
+  const team = isMgr() ? `<div class="card" style="margin-top:14px"><header><h2>Team completion, version ${SOP_VERSION}</h2>
+    <button class="btn ghost sm" data-export="training">Export CSV</button></header>
+    <table><thead><tr><th>Team member</th><th>Status</th><th>Best score</th><th>Last attempt</th></tr></thead><tbody>
+    ${cache.profiles.map(p=>{
+      const as = cache.training_attempts.filter(a=>a.user_id===p.id && a.sop_version===SOP_VERSION);
+      const best = as.reduce((m,a)=>Math.max(m,a.score),0);
+      const last = as.sort((a,b)=>a.attempted_at<b.attempted_at?1:-1)[0];
+      const ok = as.some(a=>a.passed);
+      return `<tr><td>${esc(p.full_name)}</td>
+        <td><span class="tag ${ok?'t-green':'t-red'}">${ok?'complete':'outstanding'}</span></td>
+        <td class="mono">${as.length?best+'/'+QUIZ.length:'-'}</td>
+        <td class="small mono">${last?fmtDT(last.attempted_at):'-'}</td></tr>`;}).join('')}
+    </tbody></table></div>` : '';
+
+  return `<div class="page-head"><div><span class="eyebrow">Training</span><h1>SOP v${SOP_VERSION} assessment</h1>
+    <p class="small muted" style="margin:4px 0 0">Ten questions. Pass mark ${PASS_MARK*100}%. Every attempt is recorded against the SOP version.</p></div>
+    ${passed?'<span class="tag t-green">You are signed off on version '+SOP_VERSION+'</span>':'<span class="tag t-red">Not yet signed off</span>'}</div>
+  <div class="card"><div class="body">
+    <div class="banner" style="margin-bottom:14px">Read the SOP first. The assessment covers the rules that carry regulatory or financial risk, not the sequence of steps.</div>
+    ${QUIZ.map((q,i)=>`<div class="quiz-q"><b>${i+1}. ${esc(q.q)}</b>
+      ${q.o.map((o,j)=>`<label><input type="radio" name="q${i}" value="${j}" ${quizAnswers[i]==j?'checked':''}>${esc(o)}</label>`).join('')}</div>`).join('')}
+    <div class="row" style="margin-top:14px"><button class="btn" id="quiz-submit">Submit assessment</button>
+      <span class="small muted">Your answers are not saved until you submit.</span></div>
+  </div></div>
+  ${mineA.length?`<div class="card" style="margin-top:14px"><header><h2>Your attempts</h2></header>
+    <table><thead><tr><th>When</th><th>SOP</th><th>Score</th><th>Result</th></tr></thead><tbody>
+    ${mineA.map(a=>`<tr><td class="small mono">${fmtDT(a.attempted_at)}</td><td class="small">v${a.sop_version}</td>
+      <td class="mono">${a.score}/${a.total}</td><td><span class="tag ${a.passed?'t-green':'t-red'}">${a.passed?'pass':'fail'}</span></td></tr>`).join('')}
+    </tbody></table></div>`:''}
+  ${team}`;
+}
+
+/* ---------------------------------------------------------------- records */
+function recordsView(){
+  const logs = cache.audit_log.filter(l=>isMgr()||l.actor_id===ME.id).sort((a,b)=>a.created_at<b.created_at?1:-1);
+  const inv = cache.invoice_lines.filter(l=>isMgr()||l.created_by===ME.id);
+  return `<div class="page-head"><div><span class="eyebrow">Records</span><h1>Audit trail and billing</h1></div>
+    <div class="row"><button class="btn ghost" data-export="audit">Export activity CSV</button>
+      <button class="btn ghost" data-export="tasks">Export tasks CSV</button>
+      <button class="btn" data-export="invoice">Export invoice lines CSV</button></div></div>
+  <div class="card" style="margin-bottom:14px"><header><h2>Invoice lines</h2><span class="small muted">${inv.length} lines</span></header>
+    ${inv.length?`<table><thead><tr><th>Date</th><th>Ref</th><th>Description</th><th>Practice</th><th>Patient ref</th></tr></thead><tbody>
+    ${inv.map(l=>`<tr><td class="small mono">${fmtD(l.occurred_on)}</td><td class="mono">${esc(l.ref||'')}</td>
+      <td class="small">${esc(l.description)}</td><td class="small">${esc(l.practice||'')}</td><td class="small mono">${esc(l.patient_ref||'')}</td></tr>`).join('')}
+    </tbody></table>`:'<div class="empty">Invoice lines are raised when a request closes at step 7.2.</div>'}</div>
+  <div class="card"><header><h2>Activity log</h2><span class="small muted">${logs.length} entries. Append only.</span></header>
+    ${logs.length?`<table><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Detail</th><th>Entity</th></tr></thead><tbody>
+    ${logs.slice(0,300).map(l=>`<tr><td class="small mono">${fmtDT(l.created_at)}</td><td class="small">${esc(l.actor_name||'')}</td>
+      <td class="small">${esc(l.action)}</td><td class="small muted">${esc(l.detail||'')}</td>
+      <td class="small mono">${esc(l.entity_id||l.entity)}</td></tr>`).join('')}
+    </tbody></table>`:'<div class="empty">Nothing logged yet.</div>'}</div>`;
+}
+
+/* ---------------------------------------------------------------- admin */
+function adminView(){
+  return `<div class="page-head"><div><span class="eyebrow">Admin</span><h1>Users and roles</h1></div></div>
+  <div class="card"><header><h2>Team</h2><span class="small muted">Roles take effect on the user's next page load.</span></header>
+    <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>
+    ${cache.profiles.map(p=>`<tr><td>${esc(p.full_name)}</td><td class="small mono">${esc(p.email)}</td>
+      <td><select data-role="${p.id}" style="width:auto;padding:3px 6px;font-size:12px">
+        ${['user','senior_manager','admin'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${r.replace('_',' ')}</option>`).join('')}</select></td>
+      <td><button class="btn ghost sm" data-toggle="profiles:${p.id}">${p.active!==false?'Deactivate':'Activate'}</button></td></tr>`).join('')}
+    </tbody></table></div>
+  <div class="card" style="margin-top:14px"><header><h2>Controls in force</h2></header><div class="body small">
+    <ul style="margin:0;padding-left:18px">
+      <li>Team members see only their own practices and requests. Senior managers and admins see everything.</li>
+      <li>Approvals can only be recorded by a senior manager or admin.</li>
+      <li>The activity log has no update or delete path, in the interface or in the database policies.</li>
+      <li>Suppliers and couriers can only be changed by an admin.</li>
+    </ul>
+    <p class="hint">With one senior manager active, every approval is a single point of failure. Appoint a second before volume grows.</p>
+  </div></div>`;
+}
+
+/* ---------------------------------------------------------------- modal */
+let modalOk = null;
+function modal(title, bodyHtml, onOk){
+  modalOk = onOk;
+  const el = document.createElement('div');
+  el.className = 'modal-bg';
+  el.innerHTML = `<div class="modal"><header><h2>${esc(title)}</h2>
+    <button class="btn ghost sm" data-mclose>Close</button></header>
+    <div class="body">${bodyHtml}</div>
+    <footer><button class="btn ghost" data-mclose>Cancel</button><button class="btn" id="m-ok">Confirm</button></footer></div>`;
+  document.body.appendChild(el);
+  el.addEventListener('click', e => { if (e.target === el || e.target.hasAttribute('data-mclose')) el.remove(); });
+  el.querySelector('#m-ok').onclick = async () => { const fn = modalOk; el.remove(); if (fn) await fn(); };
+}
+
+/* ---------------------------------------------------------------- add forms */
+function addForm(kind, parentId){
+  if (kind === 'practice') return ['Add practice', `
+    <div class="field"><label>Practice name</label><input id="n-name"></div>
+    <div class="grid g2"><div class="field"><label>BHF number</label><input id="n-bhf"></div>
+    <div class="field"><label>City</label><input id="n-city"></div>
+    <div class="field"><label>Phone</label><input id="n-phone"></div>
+    <div class="field"><label>Email</label><input id="n-email"></div></div>`,
+    async () => {
+      const v = id => (document.getElementById(id)||{}).value?.trim();
+      if (!v('n-name')) return toast('Enter a practice name');
+      const [p] = await db.insert('practices', {name:v('n-name'), bhf_number:v('n-bhf'), city:v('n-city'), phone:v('n-phone'), email:v('n-email'), active:true, owner_id:ME.id});
+      await log('Practice added', {entity:'practice', entity_id:p.id, detail:p.name}); render();
+    }];
+  if (kind === 'doctor') return ['Add doctor', `
+    <div class="field"><label>Full name</label><input id="n-name"></div>
+    <div class="grid g2"><div class="field"><label>HPCSA number</label><input id="n-hpcsa"></div>
+    <div class="field"><label>Speciality</label><input id="n-spec"></div>
+    <div class="field"><label>Phone</label><input id="n-phone"></div>
+    <div class="field"><label>Email</label><input id="n-email"></div></div>`,
+    async () => {
+      const v = id => (document.getElementById(id)||{}).value?.trim();
+      if (!v('n-name')) return toast('Enter a name');
+      const [d] = await db.insert('doctors', {practice_id:parentId, full_name:v('n-name'), hpcsa_number:v('n-hpcsa'), speciality:v('n-spec'), phone:v('n-phone'), email:v('n-email'), active:true, owner_id:ME.id});
+      await log('Doctor added', {entity:'doctor', entity_id:d.id, detail:d.full_name}); render();
+    }];
+  if (kind === 'rep') return ['Add representative', `
+    <div class="field"><label>Full name</label><input id="n-name"></div>
+    <div class="grid g2"><div class="field"><label>Role or company</label><input id="n-company"></div>
+    <div class="field"><label>Phone</label><input id="n-phone"></div>
+    <div class="field"><label>Email</label><input id="n-email"></div></div>`,
+    async () => {
+      const v = id => (document.getElementById(id)||{}).value?.trim();
+      if (!v('n-name')) return toast('Enter a name');
+      const [x] = await db.insert('representatives', {practice_id:parentId, full_name:v('n-name'), company:v('n-company'), phone:v('n-phone'), email:v('n-email'), active:true, owner_id:ME.id});
+      await log('Representative added', {entity:'representative', entity_id:x.id, detail:x.full_name}); render();
+    }];
+  if (kind === 'supplier') return ['Add supplier', `
+    <div class="field"><label>Supplier name</label><input id="n-name"></div>
+    <div class="grid g2"><div class="field"><label>Country</label><input id="n-country"></div>
+    <div class="field"><label>Contact name</label><input id="n-contact"></div>
+    <div class="field"><label>Email</label><input id="n-email"></div>
+    <div class="field"><label>Mobile</label><input id="n-mobile"></div></div>`,
+    async () => {
+      const v = id => (document.getElementById(id)||{}).value?.trim();
+      if (!v('n-name')) return toast('Enter a supplier name');
+      const [s] = await db.insert('suppliers', {name:v('n-name'), country:v('n-country'), contact_name:v('n-contact'), email:v('n-email'), mobile:v('n-mobile'), tel:'', website:'', active:true});
+      await log('Supplier added', {entity:'supplier', entity_id:s.id, detail:s.name}); render();
+    }];
+  if (kind === 'courier') return ['Add courier', `
+    <div class="field"><label>Company</label><input id="n-name"></div>
+    <div class="grid g2"><div class="field"><label>Contact name</label><input id="n-contact"></div>
+    <div class="field"><label>Contact number</label><input id="n-number"></div>
+    <div class="field"><label>Email</label><input id="n-email"></div>
+    <div class="field"><label>Cold chain</label><select id="n-cold"><option value="no">No</option><option value="yes">Yes</option></select></div></div>`,
+    async () => {
+      const v = id => (document.getElementById(id)||{}).value?.trim();
+      if (!v('n-name')) return toast('Enter a company name');
+      const [c] = await db.insert('couriers', {name:v('n-name'), contact_name:v('n-contact'), contact_number:v('n-number'), email:v('n-email'), cold_chain: v('n-cold')==='yes', active:true});
+      await log('Courier added', {entity:'courier', entity_id:c.id, detail:c.name}); render();
+    }];
+}
+
+/* ---------------------------------------------------------------- CSV */
+function toCSV(rows){
+  if (!rows.length) return '';
+  const cols = [...new Set(rows.flatMap(Object.keys))];
+  const cell = v => v === null || v === undefined ? '' : `"${String(v).replace(/"/g,'""')}"`;
+  return [cols.join(','), ...rows.map(r => cols.map(c => cell(r[c])).join(','))].join('\r\n');
+}
+function download(name, csv){
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+function exportSet(what){
+  const stamp = new Date().toISOString().slice(0,10);
+  const nameOf = (t,id,f='full_name') => { const x = cache[t].find(r=>r.id===id); return x ? x[f] : ''; };
+  if (what === 'requests'){
+    const rows = visible(cache.requests).map(r=>({ref:r.ref, product:r.product_name, strength:r.strength, quantity:r.quantity,
+      practice:nameOf('practices',r.practice_id,'name'), doctor:nameOf('doctors',r.doctor_id), representative:nameOf('representatives',r.representative_id),
+      patient_ref:r.patient_ref, required_by:r.required_by, urgent:r.urgent, section21_by_us:r.s21_by_us, nappi_code:r.nappi_code,
+      sahpra_ref:r.sahpra_ref, status:r.status, owner:nameOf('profiles',r.owner_id), created:r.created_at, closed:r.closed_at}));
+    return download(`requests_${stamp}.csv`, toCSV(rows));
+  }
+  if (what === 'customers'){
+    const rows = [];
+    visible(cache.practices).forEach(p=>{
+      rows.push({type:'Practice', practice:p.name, name:p.name, bhf:p.bhf_number, hpcsa:'', detail:p.city, email:p.email, phone:p.phone, active:p.active});
+      cache.doctors.filter(d=>d.practice_id===p.id).forEach(d=>rows.push({type:'Doctor', practice:p.name, name:d.full_name, bhf:p.bhf_number, hpcsa:d.hpcsa_number, detail:d.speciality, email:d.email, phone:d.phone, active:d.active}));
+      cache.representatives.filter(x=>x.practice_id===p.id).forEach(x=>rows.push({type:'Representative', practice:p.name, name:x.full_name, bhf:p.bhf_number, hpcsa:'', detail:x.company, email:x.email, phone:x.phone, active:x.active}));
+    });
+    return download(`customers_${stamp}.csv`, toCSV(rows));
+  }
+  if (what === 'suppliers') return download(`suppliers_${stamp}.csv`, toCSV(cache.suppliers.map(({id,...r})=>r)));
+  if (what === 'tasks'){
+    const ids = visible(cache.requests).map(r=>r.id);
+    const rows = cache.tasks.filter(t=>ids.includes(t.request_id)).map(t=>{
+      const r = cache.requests.find(x=>x.id===t.request_id);
+      return {ref:r.ref, step:t.step_code, phase:t.phase, action:t.title, sla_type:t.sla_type, sla_hours:t.sla_hours,
+        role:t.role_required, status:t.status, due:t.due_at, completed:t.completed_at, completed_by:nameOf('profiles',t.completed_by), comment:t.comment};
+    });
+    return download(`tasks_${stamp}.csv`, toCSV(rows));
+  }
+  if (what === 'invoice'){
+    const rows = cache.invoice_lines.filter(l=>isMgr()||l.created_by===ME.id).map(l=>({date:l.occurred_on, ref:l.ref,
+      description:l.description, practice:l.practice, doctor:l.doctor, patient_ref:l.patient_ref, billable:l.billable, raised_by:nameOf('profiles',l.created_by)}));
+    return download(`invoice_lines_${stamp}.csv`, toCSV(rows));
+  }
+  if (what === 'training'){
+    const rows = cache.training_attempts.map(a=>({name:nameOf('profiles',a.user_id), sop_version:a.sop_version, score:a.score, total:a.total, passed:a.passed, when:a.attempted_at}));
+    return download(`training_${stamp}.csv`, toCSV(rows));
+  }
+  if (what === 'sop'){
+    const rows = STEPS.map(s=>({version:SOP_VERSION, step:s.code, phase:s.phase, action:s.title, detail:s.detail,
+      responsible:s.role, sla_hours:s.type==='external'?'':s.sla, sla_type:s.type, applies_when:s.cond}));
+    return download(`sop_v${SOP_VERSION}_${stamp}.csv`, toCSV(rows));
+  }
+  if (what.startsWith('audit')){
+    const rid = what.includes('-') ? what.split('-')[1] : null;
+    const rows = cache.audit_log.filter(l => (isMgr()||l.actor_id===ME.id) && (!rid || l.request_id===rid))
+      .map(l=>({when:l.created_at, who:l.actor_name, action:l.action, detail:l.detail, entity:l.entity,
+        entity_id:l.entity_id, request: l.request_id ? (cache.requests.find(r=>r.id===l.request_id)||{}).ref : ''}));
+    return download(`activity_${stamp}.csv`, toCSV(rows));
+  }
+}
+
+/* ---------------------------------------------------------------- wiring */
+function wire(){
+  const on = (sel, ev, fn) => document.querySelectorAll(sel).forEach(el => el.addEventListener(ev, fn));
+  on('[data-go]','click', e => go(e.currentTarget.dataset.go));
+  on('[data-open]','click', e => go('request', e.currentTarget.dataset.open));
+  on('[data-export]','click', e => exportSet(e.currentTarget.dataset.export));
+  const so = document.getElementById('signout');
+  if (so) so.onclick = async () => { if (!DEMO) await sb.auth.signOut(); ME = null; route={view:'dash',id:null}; render(); };
+
+  on('[data-done]','click', e => completeTask(e.currentTarget.dataset.done));
+  on('[data-na]','click', e => {
+    const t = cache.tasks.find(x=>x.id===e.currentTarget.dataset.na);
+    modal('Mark step not applicable', `<div class="field"><label>Reason, required</label><input id="m-r"></div>`, async () => {
+      const reason = document.getElementById('m-r').value.trim();
+      if (!reason) return toast('A reason is required');
+      await db.update('tasks', t.id, {status:'na', comment:reason, completed_at:new Date().toISOString(), completed_by:ME.id});
+      await log('Step marked not applicable, ' + t.step_code, {request_id:t.request_id, entity:'task', entity_id:t.step_code, detail:reason});
+      await refresh(); await advanceDues(t.request_id); render();
+    });
+  });
+  on('[data-note]','click', e => {
+    const t = cache.tasks.find(x=>x.id===e.currentTarget.dataset.note);
+    modal('Add a note', `<div class="field"><label>Note</label><textarea id="m-n">${esc(t.comment||'')}</textarea></div>`, async () => {
+      const n = document.getElementById('m-n').value.trim();
+      await db.update('tasks', t.id, {comment:n});
+      await log('Note added on ' + t.step_code, {request_id:t.request_id, entity:'task', entity_id:t.step_code, detail:n});
+      render();
+    });
+  });
+  on('[data-rfq]','change', async e => {
+    const q = cache.rfq_items.find(x=>x.id===e.currentTarget.dataset.rfq);
+    const status = e.currentTarget.value;
+    const s = cache.suppliers.find(x=>x.id===q.supplier_id);
+    const patch = {status, updated_by:ME.id, updated_at:new Date().toISOString()};
+    if (status==='sent' && !q.sent_at) patch.sent_at = patch.updated_at;
+    if (['quoted','declined'].includes(status)) patch.responded_at = patch.updated_at;
+    await db.update('rfq_items', q.id, patch);
+    await log('RFQ ' + status.replace('_',' ') + ', ' + s.name, {request_id:q.request_id, entity:'rfq', entity_id:s.name});
+    render();
+  });
+  on('[data-hold]','click', async e => {
+    const id = e.currentTarget.dataset.hold;
+    modal('Put the request on hold', `<div class="field"><label>Reason</label><input id="m-h"></div>`, async () => {
+      await db.update('requests', id, {status:'on_hold'});
+      await log('Request put on hold', {request_id:id, entity:'request', detail:document.getElementById('m-h').value.trim()});
+      render();
+    });
+  });
+  on('[data-close]','click', async e => {
+    const id = e.currentTarget.dataset.close;
+    modal('Close the request', `<div class="field"><label>Outcome</label><select id="m-o">
+      <option value="completed">Completed</option><option value="lost">Lost</option>
+      <option value="rejected">Rejected by SAHPRA</option><option value="withdrawn">Withdrawn by practice</option></select></div>
+      <div class="field"><label>Note</label><input id="m-cn"></div>`, async () => {
+      const o = document.getElementById('m-o').value;
+      await db.update('requests', id, {status: o==='completed'?'closed':'lost', outcome:o, closed_at:new Date().toISOString()});
+      await log('Request closed, ' + o, {request_id:id, entity:'request', detail:document.getElementById('m-cn').value.trim()});
+      go('requests');
+    });
+  });
+  on('[data-add]','click', e => {
+    const [kind, parent] = e.currentTarget.dataset.add.split(':');
+    const [title, body, ok] = addForm(kind, parent);
+    modal(title, body, ok);
+  });
+  on('[data-del]','click', e => {
+    const [table, id] = e.currentTarget.dataset.del.split(':');
+    modal('Remove this record', `<p class="small">This cannot be undone. Records linked to an existing request should be deactivated instead of removed.</p>`, async () => {
+      try{ await db.remove(table, id); await log('Record removed from ' + table, {entity:table, entity_id:id}); render(); }
+      catch(err){ toast('Cannot remove, it is linked to a request. Deactivate it instead.'); }
+    });
+  });
+  on('[data-toggle]','click', async e => {
+    const [table, id] = e.currentTarget.dataset.toggle.split(':');
+    const row = cache[table].find(x=>x.id===id);
+    await db.update(table, id, {active: row.active === false});
+    await log((row.active===false?'Activated':'Deactivated') + ' ' + table, {entity:table, entity_id:id, detail:row.name||row.full_name});
+    render();
+  });
+  on('[data-role]','change', async e => {
+    const id = e.currentTarget.dataset.role, role = e.currentTarget.value;
+    const p = cache.profiles.find(x=>x.id===id);
+    await db.update('profiles', id, {role});
+    await log('Role changed to ' + role, {entity:'profile', entity_id:id, detail:p.full_name});
+    if (id === ME.id) ME.role = role;
+    toast('Role updated'); render();
+  });
+
+  // new request: cascading selects
+  const fp = document.getElementById('f-practice');
+  if (fp){
+    const fill = () => {
+      const pid = fp.value;
+      document.getElementById('f-doctor').innerHTML = cache.doctors.filter(d=>d.practice_id===pid && d.active!==false)
+        .map(d=>`<option value="${d.id}">${esc(d.full_name)}</option>`).join('') || '<option value="">No doctors recorded</option>';
+      document.getElementById('f-rep').innerHTML = '<option value="">None</option>' + cache.representatives.filter(x=>x.practice_id===pid && x.active!==false)
+        .map(x=>`<option value="${x.id}">${esc(x.full_name)}</option>`).join('');
+    };
+    fp.onchange = fill; fill();
+    document.getElementById('f-save').onclick = createRequest;
+  }
+
+  // calculator
+  ['fx','uplift','margin','daysCycle','cycles','fee','logistics','discount'].forEach(k=>{
+    const el = document.getElementById(k);
+    if (el) el.oninput = () => { CALC[k] = parseFloat(el.value)||0; render(); };
+  });
+  [0,1,2,3].forEach(i=>{
+    const q = document.getElementById('q'+i), p = document.getElementById('pd'+i);
+    if (q) q.oninput = () => { CALC.q[i] = parseFloat(q.value)||0; render(); };
+    if (p) p.oninput = () => { CALC.packsDay[i] = parseFloat(p.value)||0; render(); };
+  });
+  const cok = document.getElementById('c-ok'), cno = document.getElementById('c-no');
+  const decide = async dec => {
+    const rid = document.getElementById('c-req').value;
+    if (!rid) return toast('Select a request');
+    await db.insert('approvals', {request_id:rid, kind:'pricing', decision:dec, note:null, decided_by:ME.id, decided_at:new Date().toISOString()});
+    const t = cache.tasks.find(x=>x.request_id===rid && x.step_code==='2.5');
+    if (t && !['done','na'].includes(t.status)) await finish(t, 'Recorded from the calculator, ' + dec);
+    await log('Pricing ' + dec, {request_id:rid, entity:'approval', entity_id:'2.5'});
+    toast('Pricing ' + dec); render();
+  };
+  if (cok) cok.onclick = () => decide('approved');
+  if (cno) cno.onclick = () => decide('rejected');
+
+  // quiz
+  document.querySelectorAll('.quiz-q input[type=radio]').forEach(el=>{
+    el.onchange = () => { quizAnswers[Number(el.name.slice(1))] = Number(el.value); };
+  });
+  const qs = document.getElementById('quiz-submit');
+  if (qs) qs.onclick = async () => {
+    if (Object.keys(quizAnswers).length < QUIZ.length) return toast('Answer every question before submitting');
+    let score = 0; QUIZ.forEach((q,i)=>{ if (quizAnswers[i] === q.a) score++; });
+    const passed = score / QUIZ.length >= PASS_MARK;
+    await db.insert('training_attempts', {user_id:ME.id, sop_version:SOP_VERSION, score, total:QUIZ.length, passed, attempted_at:new Date().toISOString()});
+    await log('Training attempt, ' + score + '/' + QUIZ.length + (passed?', pass':', fail'), {entity:'training', entity_id:SOP_VERSION});
+    quizAnswers = {};
+    toast(passed ? `Passed with ${score} of ${QUIZ.length}` : `Not passed, ${score} of ${QUIZ.length}. Review the SOP and try again.`);
+    render();
+  };
+}
+
+boot();
+</script>
+</body>
+</html>
