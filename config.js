@@ -11,6 +11,6 @@
 // Never put the service_role or sb_secret_ key in this file.
 
 window.S21_CONFIG = {
-  SUPABASE_URL: '',
-  SUPABASE_ANON_KEY: ''
+  SUPABASE_URL: 'https://dvaxfkjunsdrtrzskwmq.supabase.co',
+  SUPABASE_ANON_KEY: 'sb_publishable_ULRqS7UfzVZAtV5sd00nYg_w3bymsHa'
 };
