@@ -719,6 +719,7 @@ function requestView(id){
       <p class="small muted" style="margin:4px 0 0">${esc(pr.name||'')} , ${esc(dr.full_name||'')}${rep?' , via '+esc(rep.full_name):''} , patient ${esc(r.patient_ref)}</p></div>
     <div class="row">
       <button class="btn ghost" data-go="requests">Back</button>
+      <button class="btn ghost" data-invoice="${r.id}">Raise invoice line</button>
       ${r.status==='open'?`<button class="btn ghost" data-hold="${r.id}">Put on hold</button><button class="btn ghost" data-close="${r.id}">Close request</button>`:`<span class="tag t-grey">${esc(r.status)}</span>`}
     </div></div>
 
@@ -1190,6 +1191,7 @@ function toCSV(rows){
   return [cols.join(','), ...rows.map(r => cols.map(c => cell(r[c])).join(','))].join('\r\n');
 }
 function download(name, csv){
+  if (!csv || !csv.trim()){ toast('Nothing to export yet'); return; }
   const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name; a.click();
@@ -1295,6 +1297,24 @@ function wire(){
     await db.update('rfq_items', q.id, patch);
     await log('RFQ ' + status.replace('_',' ') + ', ' + s.name, {request_id:q.request_id, entity:'rfq', entity_id:s.name});
     render();
+  });
+  on('[data-invoice]','click', e => {
+    const r = cache.requests.find(x=>x.id===e.currentTarget.dataset.invoice);
+    const lines = cache.invoice_lines.filter(l=>l.request_id===r.id).length;
+    modal('Raise an invoice line', `
+      ${lines?`<div class="banner" style="margin-bottom:12px">${lines} line${lines>1?'s have':' has'} already been raised against ${esc(r.ref)}. Check the Records page before adding another.</div>`:''}
+      <div class="field"><label>Description</label><input id="m-idesc" value="Section 21 facilitation, ${esc(r.product_name)}${itemsOf(r.id).length?', '+esc(itemSummary(r.id)):''}"></div>
+      <div class="field"><label>Date</label><input id="m-idate" type="date" value="${new Date().toISOString().slice(0,10)}"></div>`,
+      async () => {
+        const d = document.getElementById('m-idesc').value.trim();
+        if (!d){ toast('Enter a description'); return false; }
+        await db.insert('invoice_lines', {request_id:r.id, ref:r.ref, description:d,
+          practice:(cache.practices.find(p=>p.id===r.practice_id)||{}).name,
+          doctor:(cache.doctors.find(x=>x.id===r.doctor_id)||{}).full_name,
+          patient_ref:r.patient_ref, occurred_on:document.getElementById('m-idate').value, billable:true, created_by:ME.id});
+        await log('Invoice line raised', {request_id:r.id, entity:'invoice', entity_id:r.ref, detail:d});
+        toast('Invoice line raised'); render();
+      });
   });
   on('[data-hold]','click', async e => {
     const id = e.currentTarget.dataset.hold;
