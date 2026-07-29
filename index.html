@@ -160,7 +160,7 @@ const FALLBACK = {
 const CONFIG = (window.S21_CONFIG && window.S21_CONFIG.SUPABASE_URL) ? window.S21_CONFIG : FALLBACK;
 
 /* ---------------------------------------------------------------- SOP v2 */
-const SOP_VERSION = '2.0';
+const SOP_VERSION = '2.1';
 const SOP_EFFECTIVE = '2026-07-29';
 const STEPS = [
  {code:'1.1',phase:'Intake',title:'Log request',detail:'Capture practice, doctor, representative, patient reference, product, strength and route of request.',role:'user',sla:0,type:'start',cond:'always'},
@@ -168,6 +168,7 @@ const STEPS = [
  {code:'1.3',phase:'Intake',title:'Confirm timeline required',detail:'Confirm the date the medicine is required by and whether the case is urgent.',role:'user',sla:4,type:'internal',cond:'always'},
  {code:'1.4',phase:'Intake',title:'Confirm target price',detail:'Confirm the practice target price. Record confirmation only, not the figure.',role:'user',sla:4,type:'internal',cond:'always'},
  {code:'1.5',phase:'Intake',title:'Confirm Section 21 scope',detail:'Confirm whether we prepare and submit the application, or the practice does.',role:'user',sla:4,type:'internal',cond:'always'},
+ {code:'1.6',phase:'Intake',title:'Request the prescription',detail:'Request the signed prescription from the prescribing doctor. It governs the quantity confirmed at 1.2, must accompany the Section 21 application, and is handed to the partner pharmacy at dispensing.',role:'user',sla:4,type:'internal',cond:'always'},
  {code:'2.1',phase:'Sourcing',title:'Issue request for quote',detail:'Send the RFQ from Outlook to the active supplier list. Log dispatch against each supplier in the RFQ tracker.',role:'user',sla:2,type:'internal',cond:'always'},
  {code:'2.2',phase:'Sourcing',title:'Follow up non-responders',detail:'Chase every supplier still showing no response and mark the outcome.',role:'user',sla:24,type:'internal',cond:'always'},
  {code:'2.3',phase:'Sourcing',title:'Close RFQ round',detail:'Mark each supplier as quoted, declined or no response. At least one quote is required to proceed.',role:'user',sla:2,type:'internal',cond:'always'},
@@ -198,13 +199,14 @@ const STEPS = [
  {code:'6.6',phase:'Fulfilment',title:'Senior manager approves courier',detail:'Senior manager selects and approves the courier.',role:'senior_manager',sla:2,type:'approval',cond:'always',approval:'courier'},
  {code:'6.7',phase:'Fulfilment',title:'Confirm lead time',detail:'Confirm the delivery lead time and communicate it to the practice.',role:'user',sla:2,type:'internal',cond:'always'},
  {code:'6.8',phase:'Fulfilment',title:'Confirm delivery',detail:'External wait. Confirm goods delivered and received in good order.',role:'user',sla:0,type:'external',cond:'always'},
- {code:'7.1',phase:'Closure',title:'Hand over sale to partner pharmacy',detail:'Hand the sale to Dis-Chem Oncology and confirm in writing.',role:'user',sla:2,type:'internal',cond:'always'},
+ {code:'7.1',phase:'Closure',title:'Hand over sale to partner pharmacy',detail:'Hand the sale to Dis-Chem Oncology, together with the prescription, and confirm the handover in writing.',role:'user',sla:2,type:'internal',cond:'always'},
  {code:'7.2',phase:'Closure',title:'Close request and raise invoice line',detail:'Close the request and generate the invoice line item for billing.',role:'user',sla:2,type:'internal',cond:'always'}
 ];
 const PHASES = ['Intake','Sourcing','Regulatory','Listing','Funding','Fulfilment','Closure'];
 const CHECKLIST = [
  'Doctor\u2019s HPCSA certificate','Practice\u2019s BHF number','Patient identification, verified at the practice',
- 'Consent form signed by doctor and patient','Motivation letter from the prescribing doctor',
+ 'Consent form signed by doctor and patient','Signed prescription from the prescribing doctor',
+ 'Motivation letter from the prescribing doctor',
  'GMP certificate for the manufacturing site','Summary of product characteristics',
  'Certificate of analysis for the batch, where available','Proof of registration in the country of origin'
 ];
@@ -218,6 +220,7 @@ const QUIZ = [
  {q:'Suppliers who have not responded to an RFQ must be followed up within:',o:['2 hours','8 hours','24 hours','5 days'],a:2},
  {q:'How are external wait steps treated?',o:['Same business-hour SLA as internal steps','Tracked as open waits, no business-hour SLA','Ignored','Closed automatically after 48 hours'],a:1},
  {q:'Before submitting the application, which set must be checked?',o:['Supplier quotes','HPCSA certificate, BHF number, patient identification verified, signed consent','Courier quotes','NAPPI code'],a:1},
+ {q:'When is the prescription requested from the doctor?',o:['At intake, step 1.6','After SAHPRA approval','Only if the pharmacy asks for it','It is not needed, the motivation letter covers it'],a:0},
  {q:'What happens at the end of the workflow?',o:['We dispense to the patient','We invoice the medical aid','The sale is handed to the partner pharmacy and the request is closed with an invoice line','The file is deleted'],a:2}
 ];
 const PASS_MARK = 0.8;
