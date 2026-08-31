@@ -6,7 +6,7 @@ name: Keep Supabase awake
 # Setup, one time:
 #   1. In your repo: Settings, Secrets and variables, Actions, New repository secret.
 #      Name:  SUPABASE_URL   Value: https://dvaxfkjunsdrtrzskwmq.supabase.co
-#      Name:  SUPABASE_KEY   Value: your anon / publishable key
+#      Name:  SUPABASE_KEY   Value: sb_publishable_ULRqS7UfzVZAtV5sd00nYg_w3bymsHa
 #      These are the same two values that are in config.js.
 #   2. Commit this file to .github/workflows/keep-awake.yml
 #   3. Actions tab, select this workflow, Run workflow, to test it now.
