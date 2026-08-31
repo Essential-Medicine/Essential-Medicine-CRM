@@ -1,0 +1,37 @@
+name: Keep Supabase awake
+
+# Supabase pauses Free Plan projects after about a week of low activity.
+# This makes one small request twice a week so the project never goes idle.
+#
+# Setup, one time:
+#   1. In your repo: Settings, Secrets and variables, Actions, New repository secret.
+#      Name:  SUPABASE_URL   Value: https://yourref.supabase.co
+#      Name:  SUPABASE_KEY   Value: your anon / publishable key
+#      These are the same two values that are in config.js.
+#   2. Commit this file to .github/workflows/keep-awake.yml
+#   3. Actions tab, select this workflow, Run workflow, to test it now.
+#
+# Note: a plain visit to your GitHub Pages site does NOT count as activity.
+# Only requests that reach the database do, which is what this makes.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1,4'    # 06:00 UTC, Mondays and Thursdays
+  workflow_dispatch:          # lets you run it by hand from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query the suppliers table
+        run: |
+          code=$(curl -s -o /tmp/out.txt -w "%{http_code}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/suppliers?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}")
+          echo "HTTP $code"
+          cat /tmp/out.txt
+          if [ "$code" != "200" ] && [ "$code" != "401" ]; then
+            echo "::error::Supabase did not respond normally. The project may be paused."
+            exit 1
+          fi
